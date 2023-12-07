@@ -1,0 +1,58 @@
+/1ZR#Initialize
+/2ZR#Initialize
+/3ZR#Initialize
+/4ZR#Initialize
+/5ZR#Initialize
+WAIT,1
+WAIT,2
+WAIT,3
+WAIT,4
+WAIT,5
+
+/1&R#Get firmware version
+/2&R#Get firmware version
+/3&R#Get firmware version
+/4&R#Get firmware version
+/5&R#Get firmware version
+
+#Set valve to 6-way
+/2U7R
+/3U7R
+/4U7R
+
+#Pull test
+/1v300R#set start velociry
+/1V300R#set Top Velocity
+/5v300R#set start velocity
+/5V300R#set top velocity
+
+#Set valve input to 3
+/1I3R
+/5I3R
+#Wait for completion
+WAIT,1
+WAIT,5
+ALERT,aspirating
+#aspirate
+/1A3000R
+/5A3000R
+#Wait for completion
+WAIT,1
+WAIT,5
+
+#Move valves to position 6
+/1I6R
+/5I6R
+
+#Wait for completion
+WAIT,1
+WAIT,5
+ALERT,dispensing
+#dispense
+/1A0R
+/5A0R
+
+#Wait for completion
+WAIT,1
+WAIT,5
+ALERT,Success
