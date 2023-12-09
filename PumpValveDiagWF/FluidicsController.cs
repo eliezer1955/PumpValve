@@ -95,6 +95,9 @@ namespace PumpValveDiagWF
             fluidicsPort = new SerialPort();
             try
             {
+                //get name of comport associated to PumpValve (as obtained by Listports.py)
+                ComPortMap map = new ComPortMap();
+                comport = map.GetComPort( "PumpValve" );
                 fluidicsPort.PortName = comport;
                 fluidicsPort.BaudRate = 9600;
                 fluidicsPort.DataBits = 8;
