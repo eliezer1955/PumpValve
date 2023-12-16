@@ -17,7 +17,7 @@ namespace PumpValveDiagWF
         public int valve;
         public int position;
         FluidicsController fluidicsController;
-        public string CurrentMacro = "stepper.tst.txt";
+        public string CurrentMacro =  "E2E.tst.txt";
         public string[] CmdLineArgs; 
 
         public Form1( string[] args)
