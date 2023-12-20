@@ -97,7 +97,7 @@ namespace PumpValveDiagWF
             {
                 //get name of comport associated to PumpValve (as obtained by Listports.py)
                 ComPortMap map = new ComPortMap();
-                comport = map.GetComPort( "PumpValve" );
+                comport = map.GetComPort( "FLUIDICS" );
                 fluidicsPort.PortName = comport;
                 fluidicsPort.BaudRate = 9600;
                 fluidicsPort.DataBits = 8;
@@ -105,6 +105,7 @@ namespace PumpValveDiagWF
                 fluidicsPort.Parity = Parity.None;
                 fluidicsPort.ReadTimeout = 500;
                 fluidicsPort.WriteTimeout = 500;
+                fluidicsPort.Handshake = Handshake.None;
                 fluidicsPort.Open();
             }
             catch (Exception ex)
@@ -119,7 +120,7 @@ namespace PumpValveDiagWF
         {
             localFolder = Directory.GetCurrentDirectory();
             serialSetup();
-            capture = new VideoCapture();
+            //capture = new VideoCapture();
             CurrentMacro = runthis;
 
         }
