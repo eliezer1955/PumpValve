@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Emgu.CV.Structure;
+using Emgu.CV;
+using System;
 using System.IO;
 using System.IO.Ports;
 using System.Net.Sockets;
@@ -19,6 +21,10 @@ namespace PumpValveDiagWF
         FluidicsController controller = null;
         bool socketMode = false;
         public PipeClient pipeClient = null;
+        public Image<Rgb, byte> referenceImg1 = null;
+        public Image<Rgb, byte> targetImg1 = null;
+        public Image<Rgb, byte> referenceImg2 = null;
+        public Image<Rgb, byte> targetImg2 = null;
 
         public MacroRunner(FluidicsController sc, PipeClient pipeClientin, string filename = null)
         {
@@ -83,6 +89,46 @@ namespace PumpValveDiagWF
                     macroRunner.RunMacro();
                     continue;
                 }
+                // acquire reference image
+                if (line.StartsWith( "SNAPREFERENCE" ))
+                {
+                    int camera = 0;
+                    string[] line1 = line.Split( '#' ); //Disregard comments
+                    string[] parsedLine = line1[0].Split( ',' );
+                    if (string.IsNullOrWhiteSpace( parsedLine[0] )) //Disregard blanks lines
+                        continue;
+                    if (parsedLine[1] != null)
+                        camera = Int32.Parse( parsedLine[1] );
+                    if(camera==1)
+                        referenceImg1=controller.AcquireFrame( camera );
+                    else
+                        referenceImg2 = controller.AcquireFrame( camera );
+                    continue;
+                }
+                // acquire  image, compare to reference
+                if (line.StartsWith( "SNAPMEASURE" ))
+                {
+                    int camera = 0;
+                    string[] line1 = line.Split( '#' ); //Disregard comments
+                    string[] parsedLine = line1[0].Split( ',' );
+                    if (string.IsNullOrWhiteSpace( parsedLine[0] )) //Disregard blanks lines
+                        continue;
+                    if (parsedLine[1] != null)
+                        camera = Int32.Parse( parsedLine[1] );
+                    double measurement;
+                    if (camera == 1)
+                    {
+                        targetImg1 = controller.AcquireFrame( camera );
+                        measurement = controller.MeniscusFrom2Img( referenceImg1, targetImg1 );
+                    }
+                    else
+                    {
+                        targetImg2 = controller.AcquireFrame( camera );
+                        measurement = controller.MeniscusFrom2Img( referenceImg2, targetImg2 );
+                    }
+                    continue;
+                }
+
                 // Wait for fixed time
                 if (line.StartsWith("SLEEP"))
                 {

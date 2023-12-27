@@ -15,7 +15,8 @@ using Emgu.Util;
 using System.Drawing;
 using System.Net.Sockets;
 using System.Threading.Tasks;
-
+using AForge.Video.DirectShow;
+using AForge.Video;
 namespace PumpValveDiagWF
 {
     /// <summary>
@@ -38,9 +39,10 @@ namespace PumpValveDiagWF
         public SerialPort fluidicsPort;
         string localFolder;
         public string CurrentMacro = "E2E.tst.txt";
-        VideoCapture capture;
+        VideoCapture capture1, capture2;
         public int valve;
         public int valvepos;
+
         public struct CCStatsOp
         {
             public Rectangle Rectangle;
@@ -119,8 +121,17 @@ namespace PumpValveDiagWF
         public FluidicsController( string runthis, Form1 parentIn )
         {
             localFolder = Directory.GetCurrentDirectory();
-            serialSetup();
-            //capture = new VideoCapture();
+            //serialSetup();
+            // Find all cameras
+            var allCameras = new AForge.Video.DirectShow.FilterInfoCollection( FilterCategory.VideoInputDevice );
+            for (int i = 0 ; i < allCameras.Count ; i++)
+            {
+                var videoSource = new VideoCaptureDevice( allCameras[i].MonikerString );
+                
+            }
+            //Create opencv Video Capture objects
+            capture1 = new VideoCapture( 1 );
+            capture2 = new VideoCapture( 2 );
             CurrentMacro = runthis;
 
         }
@@ -224,13 +235,16 @@ namespace PumpValveDiagWF
         }
 
 
-        public Image<Rgb, byte> AcquireFrame()
+        public Image<Rgb, byte> AcquireFrame( int camera )
         {
             Image<Rgb, float> accum = new Image<Rgb, float>( 640, 480 );
             Image<Rgb, byte> img = new Image<Rgb, byte>( 640, 480 );
             for (int i = 0 ; i < 30 ; i++)
             {
-                capture.Read( img.Mat );
+                if (camera == 1)
+                    capture1.Read( img.Mat );
+                else
+                    capture2.Read( img.Mat );
                 accum += img.Convert<Rgb, float>();
             }
             accum /= 30;
