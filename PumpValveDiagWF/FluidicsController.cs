@@ -123,15 +123,24 @@ namespace PumpValveDiagWF
             localFolder = Directory.GetCurrentDirectory();
             //serialSetup();
             // Find all cameras
+            List<int> videocams = new List<int>();
             var allCameras = new AForge.Video.DirectShow.FilterInfoCollection( FilterCategory.VideoInputDevice );
             for (int i = 0 ; i < allCameras.Count ; i++)
             {
-                var videoSource = new VideoCaptureDevice( allCameras[i].MonikerString );
-                
+                string id = allCameras[i].MonikerString;
+
+                if (id.Contains( "PID_9422" )) //Producer ID for video cameras
+                {
+                    var videoSource = new VideoCaptureDevice( allCameras[i].MonikerString );
+                    videocams.Append( i );
+                }
             }
             //Create opencv Video Capture objects
-            capture1 = new VideoCapture( 1 );
-            capture2 = new VideoCapture( 2 );
+            if (videocams.Count >= 2)
+            {
+                capture1 = new VideoCapture( videocams[0] );
+                capture2 = new VideoCapture( videocams[1] );
+            }
             CurrentMacro = runthis;
 
         }
