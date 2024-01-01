@@ -8,17 +8,92 @@ WAIT,2
 WAIT,3
 WAIT,4
 WAIT,5
+ALERT,Initialization complete!
 
-/1&R#Get firmware version
-/2&R#Get firmware version
-/3&R#Get firmware version
-/4&R#Get firmware version
-/5&R#Get firmware version
+
+
 
 #Set valve to 6-way
 /2U7R
 /3U7R
 /4U7R
+
+ALERT,Please look at right middle valve, it should move after pressing continue
+/2ZR#Initialize
+WAIT,2
+/2ZR#Initialize
+WAIT,2
+/2ZR#Initialize
+WAIT,2
+/2ZR#Initialize
+WAIT,2
+/2ZR#Initialize
+WAIT,2
+/2ZR#Initialize
+WAIT,2
+/2ZR#Initialize
+WAIT,2
+/2ZR#Initialize
+WAIT,2
+ALERT, Valve 2 test OK?
+
+ALERT,Please look at right top valve, it should move after pressing 'YES'
+/3ZR
+WAIT,3
+/3ZR
+WAIT,3
+/3ZR
+WAIT,3
+/3ZR 
+WAIT,3
+/3ZR
+WAIT,3
+/3ZR
+WAIT,3
+/3ZR
+WAIT,3
+/3ZR
+WAIT,3
+
+ALERT, Valve 2 test OK?
+ALERT,Please look at left top valve, it should move after pressing 'YES'
+/4ZR
+WAIT,4
+/4ZR
+WAIT,4
+/4ZR
+WAIT,4
+/4ZR
+WAIT,4
+/4ZR
+WAIT,4
+/4ZR
+WAIT,4
+/4ZR
+WAIT,4
+
+ALERT, Valve 4 test OK?
+ALERT,Please Look at right Syringe, it should move after pressing 'YES'
+/1I3R
+WAIT,1
+/1A3000R
+WAIT,1
+/1A0R
+WAIT,1
+/1A3000R
+WAIT,1
+ALERT, Right Syringe test OK?
+ALERT,Please Look at right Syringe, it should move after pressing 'YES'
+/5I3R
+WAIT,5
+/5A3000R
+WAIT,5
+/5A0R
+WAIT,5
+/5A3000R
+WAIT,5
+ALERT, Right Syringe test OK?
+
 
 #Pull test
 /1v300R#set start velociry

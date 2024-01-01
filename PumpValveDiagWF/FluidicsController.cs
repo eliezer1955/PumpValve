@@ -121,7 +121,7 @@ namespace PumpValveDiagWF
         public FluidicsController( string runthis, Form1 parentIn )
         {
             localFolder = Directory.GetCurrentDirectory();
-            //serialSetup();
+            serialSetup();
             // Find all cameras
             List<int> videocams = new List<int>();
             var allCameras = new AForge.Video.DirectShow.FilterInfoCollection( FilterCategory.VideoInputDevice );
@@ -129,10 +129,10 @@ namespace PumpValveDiagWF
             {
                 string id = allCameras[i].MonikerString;
 
-                if (id.Contains( "PID_9422" )) //Producer ID for video cameras
+                if (id.Contains( "pid_9422" )) //Producer ID for video cameras
                 {
                     var videoSource = new VideoCaptureDevice( allCameras[i].MonikerString );
-                    videocams.Append( i );
+                    videocams.Add( i );
                 }
             }
             //Create opencv Video Capture objects

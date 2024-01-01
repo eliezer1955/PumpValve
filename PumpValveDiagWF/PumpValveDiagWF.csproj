@@ -110,6 +110,18 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="AForge">
+      <Version>2.2.5</Version>
+    </PackageReference>
+    <PackageReference Include="AForge.Imaging">
+      <Version>2.2.5</Version>
+    </PackageReference>
+    <PackageReference Include="AForge.Video">
+      <Version>2.2.5</Version>
+    </PackageReference>
+    <PackageReference Include="AForge.Video.DirectShow">
+      <Version>2.2.5</Version>
+    </PackageReference>
     <PackageReference Include="Emgu.CV">
       <Version>4.8.0.5324</Version>
     </PackageReference>
