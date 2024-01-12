@@ -36,6 +36,7 @@ WAIT,2
 /2ZR#Initialize
 WAIT,2
 ALERT, Valve 2 test OK?
+IFRETURNIS,No,LOGERROR,Valve 2 test failure
 
 ALERT,Please look at right top valve, it should move after pressing 'YES'
 /3ZR
@@ -55,7 +56,8 @@ WAIT,3
 /3ZR
 WAIT,3
 
-ALERT, Valve 2 test OK?
+ALERT, Valve 3 test OK?
+IFRETURNIS,No,LOGERROR,Valve 3 test failure
 ALERT,Please look at left top valve, it should move after pressing 'YES'
 /4ZR
 WAIT,4
@@ -73,6 +75,7 @@ WAIT,4
 WAIT,4
 
 ALERT, Valve 4 test OK?
+IFRETURNIS,No,LOGERROR,Valve 4 test failure
 ALERT,Please Look at right Syringe, it should move after pressing 'YES'
 /1I3R
 WAIT,1
@@ -83,7 +86,8 @@ WAIT,1
 /1A3000R
 WAIT,1
 ALERT, Right Syringe test OK?
-ALERT,Please Look at right Syringe, it should move after pressing 'YES'
+IFRETURNIS,No,LOGERROR,Right Syringe test failure
+ALERT,Please Look at left Syringe, it should move after pressing 'YES'
 /5I3R
 WAIT,5
 /5A3000R
@@ -92,8 +96,8 @@ WAIT,5
 WAIT,5
 /5A3000R
 WAIT,5
-ALERT, Right Syringe test OK?
-
+ALERT, Left Syringe test OK?
+IFRETURNIS,No,LOGERROR,Left Syringe test failure
 
 #Pull test
 /1v300R#set start velociry

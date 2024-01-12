@@ -24,6 +24,8 @@ namespace PumpValveDiagWF
     /// </summary>
     public class FluidicsController : Object
     {
+        private readonly log4net.ILog _logger = log4net.LogManager.GetLogger(typeof(FluidicsController));
+        
         public struct CommandStructure
         {
             public string name;
