@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using Emgu.CV.Aruco;
 
 
 
@@ -15,7 +16,7 @@ namespace PumpValveDiagWF
 {
     public class MacroRunner
     {
-        private readonly log4net.ILog _logger = log4net.LogManager.GetLogger(typeof(MacroRunner));
+        private readonly log4net.ILog _logger = log4net.LogManager.GetLogger( typeof( MacroRunner ) );
 
         public string CurrentMacro;
         public SerialPort fluidicsPort;
@@ -27,20 +28,33 @@ namespace PumpValveDiagWF
         public Image<Rgb, byte> targetImg1 = null;
         public Image<Rgb, byte> referenceImg2 = null;
         public Image<Rgb, byte> targetImg2 = null;
+        private string[] Macro;
+        private int currentline = 0;
+        private System.Collections.Generic.Dictionary<string, int> label = new System.Collections.Generic.Dictionary<string, int>();
 
-        public MacroRunner(FluidicsController sc, PipeClient pipeClientin, string filename = null)
+        public MacroRunner( FluidicsController sc, PipeClient pipeClientin, string filename = null )
         {
             fluidicsPort = sc.fluidicsPort;
             CurrentMacro = filename;
             pipeClient = pipeClientin;
             controller = sc;
             socketMode = (CurrentMacro == null);
+            int currentline = 0;
             if (CurrentMacro != null)
-                fs = new StreamReader(CurrentMacro);
+            {
+                //Load full macro into memory as array of strings
+                Macro = System.IO.File.ReadAllLines( CurrentMacro );
+                //Scan macro array for labels, record their line number in Dictionary
+                currentline = 0;
+                foreach (string line in Macro)
+                {
+                    string[] line1 = line.Split( '#' ); //Disregard comments
+                    if (line1[0].StartsWith( ":" ))
+                        label.Add( line1[0].Substring( 1 ).TrimEnd( '\r', '\n', ' ', '\t' ), currentline+1);
+                    ++currentline;
+                }
+            }
         }
-
-
-
 
 
         public async Task<string> readLine()
@@ -58,7 +72,7 @@ namespace PumpValveDiagWF
             }
             else
             {
-                s = fs.ReadLine();
+                s = currentline >= Macro.Length ? null : Macro[currentline++];
             }
             return s;
         }
@@ -67,12 +81,16 @@ namespace PumpValveDiagWF
         public async void RunMacro()
         {
 
+            if (!socketMode)
+            {
+
+            }
             //  Read in macro stream
 
             byte[] b = new byte[1024];
             string[] lastCommand;
 
-            System.Text.UTF8Encoding temp = new System.Text.UTF8Encoding(true);
+            System.Text.UTF8Encoding temp = new System.Text.UTF8Encoding( true );
             string line;
             string response = "";
             while (true)
@@ -80,16 +98,17 @@ namespace PumpValveDiagWF
                 line = await readLine();
 
                 if (line == null) break;
-                if (line.StartsWith("\0")) continue;
-                if (line.StartsWith("#")) continue;
-                if (string.IsNullOrEmpty(line)) continue;
-                if (string.IsNullOrWhiteSpace(line)) continue;
-                if (line.StartsWith("IFRETURNISNOT")) //conditional execution based on last return
+                if (line.StartsWith( "\0" )) continue;
+                if (line.StartsWith( ":" )) continue;
+                if (line.StartsWith( "#" )) continue;
+                if (string.IsNullOrEmpty( line )) continue;
+                if (string.IsNullOrWhiteSpace( line )) continue;
+                if (line.StartsWith( "IFRETURNISNOT" )) //conditional execution based on last return
                 {
                     string value = "";
-                    string[] line1 = line.Split('#'); //Disregard comments
-                    string[] parsedLine = line1[0].Split(',');
-                    if (string.IsNullOrWhiteSpace(parsedLine[0])) //Disregard blanks lines
+                    string[] line1 = line.Split( '#' ); //Disregard comments
+                    string[] parsedLine = line1[0].Split( ',' );
+                    if (string.IsNullOrWhiteSpace( parsedLine[0] )) //Disregard blanks lines
                         continue;
                     if (parsedLine[1] != null)
                         value = parsedLine[1]; //isolate target value
@@ -98,19 +117,19 @@ namespace PumpValveDiagWF
                         continue; //do nothing, go to read next command
                     //value is not equal to last response, execute conditional command
                     line = ""; //reassemble rest of conditional command
-                    for (int i = 2; i < parsedLine.Length; i++)
+                    for (int i = 2 ; i < parsedLine.Length ; i++)
                     {
                         line += parsedLine[i];
                         if (i < parsedLine.Length - 1) line += ",";
                     }
                     //coninue execution as if it was non-conditional
                 }
-                if (line.StartsWith("IFRETURNIS")) //conditional execution based on last return
+                if (line.StartsWith( "IFRETURNIS" )) //conditional execution based on last return
                 {
                     string value = "";
-                    string[] line1 = line.Split('#'); //Disregard comments
-                    string[] parsedLine = line1[0].Split(',');
-                    if (string.IsNullOrWhiteSpace(parsedLine[0])) //Disregard blanks lines
+                    string[] line1 = line.Split( '#' ); //Disregard comments
+                    string[] parsedLine = line1[0].Split( ',' );
+                    if (string.IsNullOrWhiteSpace( parsedLine[0] )) //Disregard blanks lines
                         continue;
                     if (parsedLine[1] != null)
                         value = parsedLine[1]; //isolate target value
@@ -119,161 +138,181 @@ namespace PumpValveDiagWF
                         continue; //do nothing, go to read next command
                     //value is equal to last response
                     line = ""; //reassemble rest of command
-                    for (int i = 2; i < parsedLine.Length; i++)
+                    for (int i = 2 ; i < parsedLine.Length ; i++)
                     {
                         line += parsedLine[i];
                         if (i < parsedLine.Length - 1) line += ",";
                     }
-                    //coninue execution as if it was non-conditional
+                    //continue execution as if it was non-conditional
                 }
-                if (line.StartsWith("LOGERROR")) //write log entry
+                if (line.StartsWith( "LOGERROR" )) //write log entry
                 {
                     string value = "";
-                    string[] line1 = line.Split('#'); //Disregard comments
-                    string[] parsedLine = line1[0].Split(',');
-                    if (string.IsNullOrWhiteSpace(parsedLine[0])) //Disregard blanks lines
+                    string[] line1 = line.Split( '#' ); //Disregard comments
+                    string[] parsedLine = line1[0].Split( ',' );
+                    if (string.IsNullOrWhiteSpace( parsedLine[0] )) //Disregard blanks lines
                         continue;
                     if (parsedLine[1] != null)
                         value = parsedLine[1];
 
-                    _logger.Error(value);
+                    _logger.Error( value );
                     continue;
                 }
-                // "Nested" macro calling
-                if (line.StartsWith("@"))
+                if (line.StartsWith( "GOTO" ))
                 {
-                    MacroRunner macroRunner = new MacroRunner(controller, pipeClient, line.Substring(1));
+                    string value = "";
+                    string[] line1 = line.Split( '#' ); //Disregard comments
+                    string[] parsedLine = line1[0].Split( ',' );
+                    if (string.IsNullOrWhiteSpace( parsedLine[0] )) //Disregard blanks lines
+                        continue;
+                    if (parsedLine[1] != null)
+                        value = parsedLine[1].TrimEnd('\r', '\n', ' ', '\t');
+                    if (!label.ContainsKey( value ))
+                        _logger.Error( "Unknown label " + value );
+                    else
+                    {
+
+                        currentline = label[value];
+                        continue;
+                    }
+
+                }
+
+                // "Nested" macro calling
+                if (line.StartsWith( "@" ))
+                {
+                    MacroRunner macroRunner = new MacroRunner( controller, pipeClient, line.Substring( 1 ) );
                     macroRunner.RunMacro();
                     continue;
                 }
                 // acquire reference image
-                if (line.StartsWith("SNAPREFERENCE"))
+                if (line.StartsWith( "SNAPREFERENCE" ))
                 {
                     int camera = 0;
-                    string[] line1 = line.Split('#'); //Disregard comments
-                    string[] parsedLine = line1[0].Split(',');
-                    if (string.IsNullOrWhiteSpace(parsedLine[0])) //Disregard blanks lines
+                    string[] line1 = line.Split( '#' ); //Disregard comments
+                    string[] parsedLine = line1[0].Split( ',' );
+                    if (string.IsNullOrWhiteSpace( parsedLine[0] )) //Disregard blanks lines
                         continue;
                     if (parsedLine[1] != null)
-                        camera = Int32.Parse(parsedLine[1]);
+                        camera = Int32.Parse( parsedLine[1] );
                     if (camera == 1)
-                        referenceImg1 = controller.AcquireFrame(camera);
+                        referenceImg1 = controller.AcquireFrame( camera );
                     else
-                        referenceImg2 = controller.AcquireFrame(camera);
+                        referenceImg2 = controller.AcquireFrame( camera );
                     continue;
                 }
                 // acquire  image, compare to reference
-                if (line.StartsWith("SNAPMEASURE"))
+                if (line.StartsWith( "SNAPMEASURE" ))
                 {
                     int camera = 0;
-                    string[] line1 = line.Split('#'); //Disregard comments
-                    string[] parsedLine = line1[0].Split(',');
-                    if (string.IsNullOrWhiteSpace(parsedLine[0])) //Disregard blanks lines
+                    string[] line1 = line.Split( '#' ); //Disregard comments
+                    string[] parsedLine = line1[0].Split( ',' );
+                    if (string.IsNullOrWhiteSpace( parsedLine[0] )) //Disregard blanks lines
                         continue;
                     if (parsedLine[1] != null)
-                        camera = Int32.Parse(parsedLine[1]);
+                        camera = Int32.Parse( parsedLine[1] );
                     double measurement;
                     if (camera == 1)
                     {
-                        targetImg1 = controller.AcquireFrame(camera);
-                        measurement = controller.MeniscusFrom2Img(referenceImg1, targetImg1);
+                        targetImg1 = controller.AcquireFrame( camera );
+                        measurement = controller.MeniscusFrom2Img( referenceImg1, targetImg1 );
                     }
                     else
                     {
-                        targetImg2 = controller.AcquireFrame(camera);
-                        measurement = controller.MeniscusFrom2Img(referenceImg2, targetImg2);
+                        targetImg2 = controller.AcquireFrame( camera );
+                        measurement = controller.MeniscusFrom2Img( referenceImg2, targetImg2 );
                     }
                     continue;
                 }
 
 
                 // Wait for fixed time
-                if (line.StartsWith("SLEEP"))
+                if (line.StartsWith( "SLEEP" ))
                 {
                     int delay = 0;
-                    string[] line1 = line.Split('#'); //Disregard comments
-                    string[] parsedLine = line1[0].Split(',');
-                    if (string.IsNullOrWhiteSpace(parsedLine[0])) //Disregard blanks lines
+                    string[] line1 = line.Split( '#' ); //Disregard comments
+                    string[] parsedLine = line1[0].Split( ',' );
+                    if (string.IsNullOrWhiteSpace( parsedLine[0] )) //Disregard blanks lines
                         continue;
                     if (parsedLine[1] != null)
-                        delay = Int32.Parse(parsedLine[1]);
-                    Thread.Sleep(delay);
+                        delay = Int32.Parse( parsedLine[1] );
+                    Thread.Sleep( delay );
                     continue;
                 }
                 // Wait until status is idle
-                if (line.StartsWith("WAIT"))
+                if (line.StartsWith( "WAIT" ))
                 {
-                    string[] line1 = line.Split('#'); //Disregard comments
-                    string[] parsedLine = line1[0].Split(',');
-                    if (string.IsNullOrWhiteSpace(parsedLine[0])) //Disregard blanks lines
+                    string[] line1 = line.Split( '#' ); //Disregard comments
+                    string[] parsedLine = line1[0].Split( ',' );
+                    if (string.IsNullOrWhiteSpace( parsedLine[0] )) //Disregard blanks lines
                         continue;
                     if (parsedLine[1] != null)
                     {
                         bool motionDone = false;
                         do
                         {
-                            Int32.Parse(parsedLine[1]);
+                            Int32.Parse( parsedLine[1] );
                             StringBuilder status = new StringBuilder();
-                            fluidicsPort.Write("/" + parsedLine[1] + "QR" + "\r\n");
+                            fluidicsPort.Write( "/" + parsedLine[1] + "QR" + "\r\n" );
                             fluidicsPort.BaseStream.Flush();
-                            Thread.Sleep(100);
+                            Thread.Sleep( 100 );
                             byte c1;
                             try
                             {
                                 do
                                 {
                                     c1 = (byte)fluidicsPort.ReadByte();
-                                    status.Append(c1);
+                                    status.Append( c1 );
                                 } while (c1 != '\n');
                             }
                             catch (Exception ex) { };
 
 
                             String s = status.ToString();
-                            s = s.TrimEnd('\r', '\n');
-                            if (s.Length < 3) 
+                            s = s.TrimEnd( '\r', '\n' );
+                            if (s.Length < 3)
                                 continue;
                             if ((s[2] & 0x40) != 0)
-                                    continue; //isolate status byte, busy bit
+                                continue; //isolate status byte, busy bit
                             motionDone = true;
-                            Thread.Sleep(100);
+                            Thread.Sleep( 100 );
                         } while (!motionDone);
 
                     }
                     continue;
                 }
                 // Pop up MessageBox
-                if (line.StartsWith("ALERT"))
+                if (line.StartsWith( "ALERT" ))
                 {
-                    string[] line1 = line.Split('#'); //Disregard comments
-                    string[] parsedLine = line1[0].Split(',');
-                    if (string.IsNullOrWhiteSpace(parsedLine[0])) //Disregard blanks lines
+                    string[] line1 = line.Split( '#' ); //Disregard comments
+                    string[] parsedLine = line1[0].Split( ',' );
+                    if (string.IsNullOrWhiteSpace( parsedLine[0] )) //Disregard blanks lines
                         continue;
                     if (parsedLine[1] != null)
                     {
                         MessageBoxButtons buttons = MessageBoxButtons.YesNo;
                         DialogResult result;
-                        result = MessageBox.Show(parsedLine[1], "Stepper Alert!", buttons);
+                        result = MessageBox.Show( parsedLine[1], "Stepper Alert!", buttons );
                         response = result.ToString();
                         continue;
                     }
                 }
 
 
-                if (line.StartsWith("REPORT"))
+                if (line.StartsWith( "REPORT" ))
                 {
 
-                    string[] line1 = line.Split('#'); //Disregard comments
-                    string[] parsedLine = line1[0].Split(',');
-                    if (string.IsNullOrWhiteSpace(parsedLine[0])) //Disregard blank lines
+                    string[] line1 = line.Split( '#' ); //Disregard comments
+                    string[] parsedLine = line1[0].Split( ',' );
+                    if (string.IsNullOrWhiteSpace( parsedLine[0] )) //Disregard blank lines
                         continue;
 
                     if (parsedLine[1] != null)
                     {
-                        var i = line.IndexOf(',');
+                        var i = line.IndexOf( ',' );
                         if (i > -1)
                         {
-                            await pipeClient.client.Send("PumpValve:" + line.Substring(i + 1));
+                            await pipeClient.client.Send( "PumpValve:" + line.Substring( i + 1 ) );
                             continue;
                         }
                     }
@@ -281,18 +320,18 @@ namespace PumpValveDiagWF
 
 
                 //Actual command
-                string[] lin1 = line.Split('#');
-                lin1[0] = lin1[0].TrimEnd(new char[] { ' ', '\r', '\n', '\t' });
-                if (!string.IsNullOrWhiteSpace(lin1[0]))
+                string[] lin1 = line.Split( '#' );
+                lin1[0] = lin1[0].TrimEnd( new char[] { ' ', '\r', '\n', '\t' } );
+                if (!string.IsNullOrWhiteSpace( lin1[0] ))
                 {
                     lastCommand = lin1;
 
                     fluidicsPort.DiscardOutBuffer();
                     fluidicsPort.DiscardInBuffer();
 
-                    fluidicsPort.Write(lin1[0] + "\r\n");
+                    fluidicsPort.Write( lin1[0] + "\r\n" );
                     fluidicsPort.BaseStream.Flush();
-                    Thread.Sleep(10);
+                    Thread.Sleep( 10 );
 
                     StringBuilder response1 = new StringBuilder();
                     try
@@ -301,7 +340,7 @@ namespace PumpValveDiagWF
                         {
                             fluidicsPort.ReadTimeout = 500;
                             int RxBuffer = fluidicsPort.ReadByte();
-                            response1.Append((char)RxBuffer);
+                            response1.Append( (char)RxBuffer );
                             if (RxBuffer == '\n') break;
                         } while (true);
                     }

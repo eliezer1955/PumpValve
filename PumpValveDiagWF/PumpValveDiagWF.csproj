@@ -126,13 +126,13 @@
       <Version>2.2.5</Version>
     </PackageReference>
     <PackageReference Include="Emgu.CV">
-      <Version>4.8.0.5324</Version>
+      <Version>4.8.1.5350</Version>
     </PackageReference>
     <PackageReference Include="Emgu.CV.Bitmap">
-      <Version>4.8.0.5324</Version>
+      <Version>4.8.1.5350</Version>
     </PackageReference>
     <PackageReference Include="Emgu.CV.runtime.windows">
-      <Version>4.8.0.5324</Version>
+      <Version>4.8.1.5350</Version>
     </PackageReference>
     <PackageReference Include="log4net">
       <Version>2.0.15</Version>
