@@ -40,7 +40,8 @@ namespace PumpValveDiagWF
         public int LeftRightChoice;
         public SerialPort fluidicsPort;
         string localFolder;
-        public string CurrentMacro = "E2E.tst.txt";
+        public string CurrentMacro = "calibrate camera.txt";
+//        public string CurrentMacro = "E2E.tst.txt";
         VideoCapture capture1, capture2;
         public int valve;
         public int valvepos;
