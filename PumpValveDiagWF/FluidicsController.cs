@@ -264,6 +264,7 @@ namespace PumpValveDiagWF
             accum.Dispose();
             return img;
         }
+        /*
         public double MeniscusFrom2Img( Image<Rgb, byte> img1, Image<Rgb, byte> img2 )
         {
             double delta = int.MaxValue;
@@ -320,6 +321,7 @@ namespace PumpValveDiagWF
             }
             return delta;
         }
+        */
         async public Task SocketMode( string[] CmdLineArgs )
         {
             PipeClient pipeClient = new PipeClient();

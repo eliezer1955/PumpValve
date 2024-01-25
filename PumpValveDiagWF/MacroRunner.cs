@@ -9,7 +9,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Emgu.CV.Aruco;
-
+using MeniscusTracking;
+using AForge.Imaging.Filters;
+using FileManagement;
 
 
 namespace PumpValveDiagWF
@@ -191,40 +193,62 @@ namespace PumpValveDiagWF
                     int camera = 0;
                     string[] line1 = line.Split( '#' ); //Disregard comments
                     string[] parsedLine = line1[0].Split( ',' );
+
                     if (string.IsNullOrWhiteSpace( parsedLine[0] )) //Disregard blanks lines
                         continue;
+
                     if (parsedLine[1] != null)
                         camera = Int32.Parse( parsedLine[1] );
+
                     if (camera == 1)
-                        referenceImg1 = controller.AcquireFrame( camera );
+                    {
+                        referenceImg1 = controller.AcquireFrame(camera);
+                        FileManager.SaveImage(
+                            referenceImg1.ToJpegData(),
+                            FileManager.GetArchiveImgPath(FileManager.BeforeImgName, DateTime.Now.ToString("yy_MM_ddHHMmmss.ff")));
+                    }
                     else
-                        referenceImg2 = controller.AcquireFrame( camera );
+                    {
+                        referenceImg2 = controller.AcquireFrame(camera);
+                        FileManager.SaveImage(
+                            referenceImg1.ToJpegData(),
+                            FileManager.GetArchiveImgPath(FileManager.BeforeImgName, DateTime.Now.ToString("yy_MM_ddHHMmmss.ff")));
+                    }
+
                     continue;
                 }
                 // acquire  image, compare to reference
-                if (line.StartsWith( "SNAPMEASURE" ))
+                if (line.StartsWith("SNAPMEASURE"))
                 {
                     int camera = 0;
                     string[] line1 = line.Split( '#' ); //Disregard comments
                     string[] parsedLine = line1[0].Split( ',' );
+                    
                     if (string.IsNullOrWhiteSpace( parsedLine[0] )) //Disregard blanks lines
                         continue;
+                    
                     if (parsedLine[1] != null)
                         camera = Int32.Parse( parsedLine[1] );
-                    double measurement;
+
                     if (camera == 1)
                     {
-                        targetImg1 = controller.AcquireFrame( camera );
-                        measurement = controller.MeniscusFrom2Img( referenceImg1, targetImg1 );
-                        _logger.Error("Fluid measurement="+measurement.ToString());
-                        response=measurement.ToString();    
+                        targetImg1 = controller.AcquireFrame(camera);
+                        FileManager.SaveImage(
+                            targetImg1.ToJpegData(),
+                            FileManager.GetArchiveImgPath(FileManager.AfterImgName, DateTime.Now.ToString("yy_MM_ddHHMmmss.ff")));
+                        MeniscusHeight meniscus = MeniscusTracker.MeniscusFrom2Img(referenceImg1, targetImg1, true);
+                        _logger.Error($"Fluid measurement={meniscus.Value}");
+                        response=meniscus.Value.ToString();    
                     }
                     else
                     {
-                        targetImg2 = controller.AcquireFrame( camera );
-                        measurement = controller.MeniscusFrom2Img( referenceImg2, targetImg2 );
-                        _logger.Error("Fluid measurement=" + measurement.ToString());
-                        response = measurement.ToString();
+                        targetImg2 = controller.AcquireFrame(camera);
+                        MeniscusHeight meniscus = MeniscusTracker.MeniscusFrom2Img(referenceImg2, targetImg2, true);
+                        FileManager.SaveImage(
+                            targetImg2.ToJpegData(),
+                            FileManager.GetArchiveImgPath(FileManager.AfterImgName, DateTime.Now.ToString("yy_MM_ddHHMmmss.ff")));
+                        _logger.Error($"Fluid measurement={meniscus.Value}");
+                        response = meniscus.Value.ToString();
                     }
                     continue;
                 }
