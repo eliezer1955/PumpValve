@@ -44,7 +44,7 @@ namespace PumpValveDiagWF
         VideoCapture capture1, capture2;
         public int valve;
         public int valvepos;
-
+        public Form1 parent;
         public struct CCStatsOp
         {
             public Rectangle Rectangle;
@@ -122,6 +122,7 @@ namespace PumpValveDiagWF
 
         public FluidicsController( string runthis, Form1 parentIn )
         {
+            parent = parentIn;
             localFolder = Directory.GetCurrentDirectory();
             serialSetup();
             // Find all cameras
