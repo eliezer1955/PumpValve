@@ -257,6 +257,7 @@ namespace PumpValveDiagWF
                     capture1.Read( img.Mat );
                 else
                     capture2.Read( img.Mat );
+
                 accum += img.Convert<Rgb, float>();
             }
             accum /= 30;
@@ -264,64 +265,7 @@ namespace PumpValveDiagWF
             accum.Dispose();
             return img;
         }
-        /*
-        public double MeniscusFrom2Img( Image<Rgb, byte> img1, Image<Rgb, byte> img2 )
-        {
-            double delta = int.MaxValue;
-            Image<Gray, byte> gray1;
-            Image<Gray, byte> gray2;
 
-            gray1 = new Image<Gray, byte>( img1.Rows, img1.Cols );
-            CvInvoke.CvtColor( img1, gray1, Emgu.CV.CvEnum.ColorConversion.Rgb2Gray );
-            gray2 = new Image<Gray, byte>( img2.Rows, img2.Cols );
-            CvInvoke.CvtColor( img2, gray2, Emgu.CV.CvEnum.ColorConversion.Rgb2Gray );
-            gray1 = gray1.AbsDiff( gray2 );
-            gray2 = gray1.ThresholdBinary( new Gray( 3 ), new Gray( 255 ) ).Erode( 5 ).Dilate( 5 );
-
-            //CvInvoke.AdaptiveThreshold( gray1, gray2, 255,
-            //    AdaptiveThresholdType.MeanC, ThresholdType.Binary, 5, 0.0 );
-            CvInvoke.Imshow( "Before", gray1 );
-            CvInvoke.Imshow( "After", gray2 );
-            CvInvoke.WaitKey( 30 );
-
-
-            CvInvoke.Imshow( "Subtracted", gray2 );
-            CvInvoke.WaitKey( -1 );
-
-            Mat imgLabel = new Mat();
-            Mat stats = new Mat();
-            Mat centroids = new Mat();
-
-            int nLabel = CvInvoke.ConnectedComponentsWithStats( gray2, imgLabel, stats, centroids );
-            CCStatsOp[] statsOp = new CCStatsOp[stats.Rows];
-            stats.CopyTo( statsOp );
-            // Find the largest non background component.
-            // Note: range() starts from 1 since 0 is the background label.
-            int maxval = -1;
-            int maxLabel = -1;
-            Rectangle rect1 = new Rectangle( 0, 0, 0, 0 );
-            for (int i = 1 ; i < nLabel ; i++)
-            {
-                int temp = statsOp[i].Area;
-                if (temp > maxval)
-                {
-                    maxval = temp;
-                    maxLabel = i;
-                    rect1 = statsOp[i].Rectangle;
-                }
-            }
-
-            gray2.Draw( rect1, new Gray( 64 ) );
-            CvInvoke.Imshow( "Rect", gray2 );
-            CvInvoke.WaitKey( -1 );
-            if (rect1.Top != 0)
-            {
-                delta = rect1.Top - rect1.Bottom;
-                System.Console.WriteLine( rect1.Top.ToString( "G" ) + rect1.Bottom.ToString( "G" ) + delta.ToString( "G" ) );
-            }
-            return delta;
-        }
-        */
         async public Task SocketMode( string[] CmdLineArgs )
         {
             PipeClient pipeClient = new PipeClient();

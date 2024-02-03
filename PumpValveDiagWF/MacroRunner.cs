@@ -3,15 +3,14 @@ using Emgu.CV;
 using System;
 using System.IO;
 using System.IO.Ports;
-using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using Emgu.CV.Aruco;
 using MeniscusTracking;
-using AForge.Imaging.Filters;
 using FileManagement;
+using System.Collections.Generic;
+using System.Drawing.Imaging;
 
 
 namespace PumpValveDiagWF
@@ -26,16 +25,14 @@ namespace PumpValveDiagWF
         FluidicsController controller = null;
         bool socketMode = false;
         public PipeClient pipeClient = null;
-        public Image<Rgb, byte> referenceImg1 = null;
-        public Image<Rgb, byte> targetImg1 = null;
-        public Image<Rgb, byte> referenceImg2 = null;
-        public Image<Rgb, byte> targetImg2 = null;
+        public Image<Rgb, byte>[] referenceImages;
         private string[] Macro;
         private int currentline = 0;
         private System.Collections.Generic.Dictionary<string, int> label = new System.Collections.Generic.Dictionary<string, int>();
 
         public MacroRunner( FluidicsController sc, PipeClient pipeClientin, string filename = null )
         {
+            referenceImages = new Image<Rgb, byte>[2];
             fluidicsPort = sc.fluidicsPort;
             CurrentMacro = filename;
             pipeClient = pipeClientin;
@@ -79,16 +76,39 @@ namespace PumpValveDiagWF
             return s;
         }
 
+        private string processAndSave(int camera, Dictionary<Action<MeniscusAnalysis>, string> analysisFuncs)
+        {
+            Image<Rgb,byte> targetImg = controller.AcquireFrame(camera);
+            string ts = DateTime.Now.ToString("yy_MM_ddHHMmmss.ff");
+            FileManager.SaveImage(targetImg.ToJpegData(), FileManager.GetArchiveImgPath(FileManager.AfterImgName, ts));
+
+            string height = "";
+            foreach (KeyValuePair<Action<MeniscusAnalysis>, string> entry in analysisFuncs)
+            {
+                //analyze
+                MeniscusAnalysis a = MeniscusTracker.MeniscusFrom2Img(new InputImagePair(referenceImages[camera - 1], targetImg), entry.Key);
+
+                //save img
+                string saveDir = $"{FileManager.ImageArchiveDir}\\{entry.Value}";
+                if (!Directory.Exists(saveDir))
+                {
+                    Directory.CreateDirectory(saveDir);
+                }
+                foreach (NamedImage img in a.ProcessImages)
+                {
+                    FileManager.SaveImage(img.Img.ToJpegData(), $"{saveDir}\\{img.Name}.jpg");
+                }
+
+                //report
+                height = $"{a.Height}";
+                _logger.Error($"Fluid measurement={height}");
+            }
+
+            return height;
+        }
 
         public async void RunMacro()
         {
-
-            if (!socketMode)
-            {
-
-            }
-            //  Read in macro stream
-
             byte[] b = new byte[1024];
             string[] lastCommand;
 
@@ -173,11 +193,9 @@ namespace PumpValveDiagWF
                         _logger.Error( "Unknown label " + value );
                     else
                     {
-
                         currentline = label[value];
                         continue;
                     }
-
                 }
 
                 // "Nested" macro calling
@@ -200,20 +218,9 @@ namespace PumpValveDiagWF
                     if (parsedLine[1] != null)
                         camera = Int32.Parse( parsedLine[1] );
 
-                    if (camera == 1)
-                    {
-                        referenceImg1 = controller.AcquireFrame(camera);
-                        FileManager.SaveImage(
-                            referenceImg1.ToJpegData(),
-                            FileManager.GetArchiveImgPath(FileManager.BeforeImgName, DateTime.Now.ToString("yy_MM_ddHHMmmss.ff")));
-                    }
-                    else
-                    {
-                        referenceImg2 = controller.AcquireFrame(camera);
-                        FileManager.SaveImage(
-                            referenceImg1.ToJpegData(),
-                            FileManager.GetArchiveImgPath(FileManager.BeforeImgName, DateTime.Now.ToString("yy_MM_ddHHMmmss.ff")));
-                    }
+                    referenceImages[camera - 1] = controller.AcquireFrame(camera);
+                    FileManager.SaveImage(referenceImages[camera - 1].ToJpegData(),
+                        FileManager.GetArchiveImgPath(FileManager.BeforeImgName, DateTime.Now.ToString("yy_MM_ddHHMmmss.ff")));
 
                     continue;
                 }
@@ -230,26 +237,13 @@ namespace PumpValveDiagWF
                     if (parsedLine[1] != null)
                         camera = Int32.Parse( parsedLine[1] );
 
-                    if (camera == 1)
-                    {
-                        targetImg1 = controller.AcquireFrame(camera);
-                        FileManager.SaveImage(
-                            targetImg1.ToJpegData(),
-                            FileManager.GetArchiveImgPath(FileManager.AfterImgName, DateTime.Now.ToString("yy_MM_ddHHMmmss.ff")));
-                        MeniscusHeight meniscus = MeniscusTracker.MeniscusFrom2Img(referenceImg1, targetImg1, true);
-                        _logger.Error($"Fluid measurement={meniscus.Value}");
-                        response=meniscus.Value.ToString();    
-                    }
-                    else
-                    {
-                        targetImg2 = controller.AcquireFrame(camera);
-                        MeniscusHeight meniscus = MeniscusTracker.MeniscusFrom2Img(referenceImg2, targetImg2, true);
-                        FileManager.SaveImage(
-                            targetImg2.ToJpegData(),
-                            FileManager.GetArchiveImgPath(FileManager.AfterImgName, DateTime.Now.ToString("yy_MM_ddHHMmmss.ff")));
-                        _logger.Error($"Fluid measurement={meniscus.Value}");
-                        response = meniscus.Value.ToString();
-                    }
+                    Dictionary<Action<MeniscusAnalysis>, string> analysisFuncs = new Dictionary<Action<MeniscusAnalysis>, string>();
+                    analysisFuncs[MeniscusTracker.ProcessByAverage] = "processByAverage";
+                    analysisFuncs[MeniscusTracker.ProcessByOverlay] = "processByOverlay";
+                    analysisFuncs[MeniscusTracker.ProcessByAbsoluteDifference] = "processByAbsoluteDifference";
+
+                    response = processAndSave(camera, analysisFuncs);
+                    
                     continue;
                 }
 
@@ -381,6 +375,5 @@ namespace PumpValveDiagWF
                 }
             }
         }
-
     }
 }

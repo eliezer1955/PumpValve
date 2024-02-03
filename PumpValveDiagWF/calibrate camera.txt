@@ -1,1 +1,11 @@
-ALERT,hi1
+ALERT,About to snap 0ml reference image
+SNAPREFERENCE,2
+ALERT,About to snap 1ml image Please add 0.5ml water to the chamber
+SNAPMEASURE,2
+ALERT,About to snap 2ml image Please add 0.5ml water to the chamber
+SNAPMEASURE,2
+ALERT,About to snap 3ml image Please add 0.5ml water to the chamber
+SNAPMEASURE,2
+ALERT,About to snap 4ml image Please add 0.5ml water to the chamber
+SNAPMEASURE,2
+ALERT,Measurements completed

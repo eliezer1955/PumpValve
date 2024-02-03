@@ -1,98 +1,73 @@
 ﻿using System;
 using System.Drawing;
 using System.IO;
+using System.Collections.Generic;
 using Emgu.CV;
 using Emgu.CV.CvEnum;
 using Emgu.CV.Structure;
-using FileManagement;
+using System.Diagnostics;
+using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace MeniscusTracking
 {
-    public struct MeniscusHeight
+    public class InputImagePair
     {
-        public MeniscusHeight(double v, string t) { Value = v; Timestamp = t; }
-        public double Value;
+        public InputImagePair(Image<Rgb, byte> b, Image<Rgb, byte> a) { Before = b; After = a; }
+        public Image<Rgb, byte> Before;
+        public Image<Rgb, byte> After;
+    }
+
+    public class PreprocessedImagePair
+    {
+        public PreprocessedImagePair(NamedImage b, NamedImage a) { After = a; Before = b; }
+        public NamedImage After;
+        public NamedImage Before;
+    }
+
+    public struct NamedImage
+    {
+        public NamedImage(Image<Gray, byte> i, string n) { Img = i; Name = n; }
+        public Image<Gray, byte> Img;
+        public String Name;
+    }
+    public class MeniscusAnalysis
+    {
+        public InputImagePair InputImages;
+        public PreprocessedImagePair PreprocessedImages;
+        public List<NamedImage> ProcessImages;
+        public double Height;
         public string Timestamp;
+
+        public MeniscusAnalysis(InputImagePair images)
+        {
+            InputImages = images;
+            PreprocessedImages = null;
+            ProcessImages = new List<NamedImage>();
+            Height = 0;
+            Timestamp = DateTime.Now.ToString("yy_MM_ddHHMmmss.ff");
+        }
+        public void AddImage(Image<Gray, byte> i, string name)
+        {
+            ProcessImages.Add(new NamedImage(i, name));
+        }
     }
     public static class MeniscusTracker
     {
-        // Threshold value for image binarization
-        static int Threshold = 10;
-
-        // Iterations for image erosion
-        static int ErodeItr = 5;
-
-        // Iterations for image dilation
-        static int DilateItr = 5;
-
-        // Optional field indicating whether to save the gray threshold image
-        public static bool SaveThresholdImg = true;
-
         public struct CCStatsOp
         {
             public Rectangle Rectangle;
             public int Area;
         }
 
-        private static Mat myErode(Mat src, int val)
-        {
-            int erosion_size = val;
-            var dest = new Mat();
-            CvInvoke.Erode(src, dest, null, new Point(-1, -1), val, BorderType.Default, CvInvoke.MorphologyDefaultBorderValue);
-            return dest;
-        }
+        static int WaitTime = 3500;
+        static string DisplayWindow = "Mywindow";
 
+        // Iterations for image erosion
+        static int ErodeItr = 3;
 
-        // This is currently unused
-        private static int MeniscusTop(string inFileName, int frameStart, int frameEnd)
-        {
-            int frameno;
-            int minval = int.MaxValue;
-
-            var capture = new VideoCapture(inFileName);
-            Mat frame0 = new Mat();
-            BackgroundSubtractorMOG2 backSub = new BackgroundSubtractorMOG2();
-            int totFrames = (int)capture.Get(CapProp.FrameCount);
-            if (frameEnd <= frameStart)
-            {
-                frameEnd = totFrames;
-            }
-
-            capture.Set(CapProp.PosFrames, frameStart);
-            if (!capture.IsOpened)
-            {
-                System.Console.WriteLine("Unable to open: " + inFileName);
-                System.Environment.Exit(0);
-            }
-            while (true)
-            {
-                capture.Read(frame0);
-                if (frame0.IsEmpty)
-                    break;
-                frameno = (int)capture.Get(CapProp.PosFrames);
-                if (frameno > frameEnd)
-                    break;
-                Mat fgMask0 = new Mat();
-                backSub.Apply(frame0, fgMask0);
-                Rectangle rect = new Rectangle(10, 2, 100, 20);
-                CvInvoke.Rectangle(frame0, rect, new MCvScalar(255, 255, 255));
-                string label = frameno.ToString();
-                CvInvoke.PutText(frame0, label, new Point(15, 15),
-                            FontFace.HersheySimplex, 0.5, new MCvScalar(0, 0, 0));
-
-                CvInvoke.Imshow("Frame", frame0);
-                var frame1 = myErode(fgMask0, 2);
-                CvInvoke.Imshow("FG Mask", frame1);
-                CvInvoke.WaitKey(30);
-                var ret = CvInvoke.BoundingRectangle(frame1);
-                if (ret.Top != 0)
-                {
-                    minval = Math.Min(minval, ret.Top);
-                    System.Console.WriteLine(frameno.ToString("G") + " " + ret.Top.ToString("G"));
-                }
-            }
-            return minval;
-        }
+        // Iterations for image dilation
+        static int DilateItr = 3;
 
         private static void DisplayComponent(Image<Gray, byte> thresholdedDifference, Rectangle largestComponent)
         {
@@ -101,6 +76,11 @@ namespace MeniscusTracking
             CvInvoke.WaitKey(3000);
         }
 
+        private static void Display(Image<Gray, byte> i)
+        {
+            CvInvoke.Imshow(DisplayWindow, i);
+            CvInvoke.WaitKey(WaitTime);
+        }
         private static Rectangle FindLargestNonBgComponent(Image<Gray, byte> thresholdedDifference)
         {
             Mat imgLabel = new Mat();
@@ -133,65 +113,191 @@ namespace MeniscusTracking
             return largestComponent;
         }
 
-        private static Image<Gray, byte> FindThresholdedDifference(
-            Image<Rgb, byte> beforeImg, Image<Rgb, byte> afterImg)
+        private static Image<Gray, byte> Crop(Image<Gray, byte> i, Rectangle roi)
         {
-            Image<Gray, byte> beforeImgGray = new Image<Gray, byte>(beforeImg.Rows, beforeImg.Cols);
-            CvInvoke.CvtColor(beforeImg, beforeImgGray, Emgu.CV.CvEnum.ColorConversion.Rgb2Gray);
-
-
-            Image<Gray, byte> afterImgGray = new Image<Gray, byte>(afterImg.Rows, afterImg.Cols);
-            CvInvoke.CvtColor(afterImg, afterImgGray, Emgu.CV.CvEnum.ColorConversion.Rgb2Gray);
-
-            // Take the absolute-value difference of the before and after images
-            // and apply binary threshold, erosion, and dilation to it
-            return beforeImgGray.AbsDiff(afterImgGray)
-                .ThresholdBinary(new Gray(Threshold), new Gray(255))
-                .Erode(ErodeItr)
-                .Dilate(DilateItr);
+            Mat m = new Mat(i.Mat, roi);
+            return m.ToImage<Gray, byte>();
         }
 
-        public static MeniscusHeight MeniscusFrom2Img(Image<Rgb, byte> beforeImg, Image<Rgb, byte> afterImg, bool saveThresholdImg = false)
-        {
-            Image<Gray, byte> thresholdedDifference =
-                FindThresholdedDifference(beforeImg, afterImg);
 
-            // Save threshold img if indicated
-            string timestamp = DateTime.Now.ToString("yy_MM_ddHHMmmss.ff");
-            if (saveThresholdImg)
+        private static Image<Rgb, byte> doAverageClr(List<Image<Rgb, byte>> images)
+        {
+            Image<Rgb, float> accumulation = new Image<Rgb, float>(640, 480);
+            //            Image<Rgb, byte> average = new Image<Rgb, byte>(640, 480);
+
+            foreach (Image<Rgb, byte> i in images)
             {
-                FileManager.SaveImage(
-                    thresholdedDifference.ToJpegData(),
-                    FileManager.GetArchiveImgPath(FileManager.ThresholdImgName, timestamp));
+                accumulation += i.Convert<Rgb, float>();
+            }
+            accumulation /= images.Count;
+            Image<Rgb, byte> average = accumulation.Convert<Rgb, byte>();
+            accumulation.Dispose();
+
+            return average;
+        }
+
+        private static Image<Gray, byte> doAverage(Image<Gray, byte> before, Image<Gray, byte> after)
+        {
+            Image<Gray, byte> result = new Image<Gray, byte>(before.Width, before.Height);
+            result.Data = before.Data;
+            for (int y = 0; y < result.Height; y++)
+            {
+                for (int x = 0; x < result.Width; x++)
+                {
+                    result.Data[y, x, 0] = (byte)((before.Data[y, x, 0] + after.Data[y, x, 0]) / 2);
+                }
+            }
+            return result;
+            // return ((before.Convert<Gray, float>() + after.Convert<Gray, float>()) / 2).Convert<Gray,byte>();
+        }
+
+        private static Image<Gray, byte> doOverlay(Image<Gray, byte> before, Image<Gray, byte> after)
+        {
+            Image<Gray, byte> result = new Image<Gray, byte>(before.Width, before.Height);
+            result.Data = before.Data;
+            for (int y = 0; y < result.Height; y++)
+            {
+                for (int x = 0; x < result.Width; x++)
+                {
+                    // applying overlay algorithm as described here, as ternary operator
+                    // https://en.wikipedia.org/wiki/Blend_modes#Overlay
+                    result.Data[y, x, 0] = (byte)(
+                        before.Data[y, x, 0] < 127.5
+                        ? after.Data[y, x, 0] * (before.Data[y, x, 0] / 127.5)
+                        : after.Data[y, x, 0] * ((255 - before.Data[y, x, 0]) / 127.5) + (before.Data[y, x, 0] - (255 - before.Data[y, x, 0])));
+                }
             }
 
-            Rectangle largestComponent =
-                FindLargestNonBgComponent(thresholdedDifference);
-
-            // Display result for sanity check
-            // DisplayComponent(thresholdedDifference, largestComponent);
-
-            // Absolute height in pixels of the bounding box of the largest area connected component
-            double delta = largestComponent.Bottom - largestComponent.Top;
-            System.Console.WriteLine(
-                largestComponent.Top.ToString() +
-                largestComponent.Bottom.ToString() +
-                delta.ToString());
-
-            return new MeniscusHeight(delta, timestamp);
+            return result;
         }
 
-        public static MeniscusHeight MeniscusFrom2Img(
-            string beforeImgPath, string afterImgPath, bool saveThresholdImg=false)
+        private static void Preprocess(MeniscusAnalysis a)
         {
-            MeniscusHeight meniscus = MeniscusFrom2Img(
-                new Image<Rgb, Byte>(beforeImgPath),
-                new Image<Rgb, Byte>(afterImgPath),
-                saveThresholdImg);
+            // create grayscale of before image and normalize its histogram
+            // (row, col) = (y, x), NOT (x, y)
+            Image<Gray, byte> beforeImgGray = new Image<Gray, byte>(a.InputImages.Before.Rows, a.InputImages.Before.Cols);
+            CvInvoke.CvtColor(a.InputImages.Before, beforeImgGray, ColorConversion.Rgb2Gray);
+            //            beforeImgGray._EqualizeHist();
+            a.AddImage(beforeImgGray, "before_equalized");
 
-            FileManager.ArchiveImgFiles(beforeImgPath, afterImgPath, meniscus.Timestamp);
-            return meniscus;
+            // create grayscale of after image, normalize its histogram, then invert it
+            Image<Gray, byte> afterImgGray = new Image<Gray, byte>(a.InputImages.After.Rows, a.InputImages.After.Cols);
+            CvInvoke.CvtColor(a.InputImages.After, afterImgGray, ColorConversion.Rgb2Gray);
+            //            afterImgGray._EqualizeHist();
+            a.AddImage(afterImgGray, "after_equalized");
 
+            // crop the images
+            Rectangle roi = new Rectangle(244, 111, 154, 267);
+            Image<Gray, byte> beforeImgCrop = Crop(beforeImgGray, roi);
+            Image<Gray, byte> afterImgCrop = Crop(afterImgGray, roi);
+            a.AddImage(beforeImgCrop, "before_equalized_crop");
+            a.AddImage(afterImgCrop, "after_equalized_crop");
+
+            a.PreprocessedImages = new PreprocessedImagePair(
+                new NamedImage(beforeImgCrop, "before_equalized_crop"), new NamedImage(afterImgCrop, "after_equalized_crop"));
+        }
+
+        public static void ProcessByAverage(MeniscusAnalysis a)
+        {
+            Image<Gray, byte> afterImgInv = new Image<Gray, byte>(
+                a.PreprocessedImages.After.Img.Width,
+                a.PreprocessedImages.After.Img.Height);
+            CvInvoke.BitwiseNot(a.PreprocessedImages.After.Img, afterImgInv);
+            a.AddImage(afterImgInv, "inversion");
+
+            Image<Gray, byte> average = doAverage(a.PreprocessedImages.Before.Img, afterImgInv);
+            a.AddImage(average, "average");
+
+            Image<Gray, byte> threshold = average.ThresholdBinary(new Gray(138), new Gray(255));
+            a.AddImage(threshold, "threshold");
+
+            Image<Gray, byte> erosion = threshold.Erode(ErodeItr);
+            a.AddImage(erosion, "erosion");
+
+            Image<Gray, byte> dilation = erosion.Dilate(DilateItr);
+            a.AddImage(dilation, "dilation");
+        }
+
+        public static void ProcessByOverlay(MeniscusAnalysis a)
+        {
+            // average the before and after images
+            // this combines the data from what happened before and after
+            // and reduces the effect of extraneous minor differences
+            Image<Gray, byte> average = doAverage(a.PreprocessedImages.Before.Img, a.PreprocessedImages.After.Img);
+            a.AddImage(average, "average");
+
+            // overlay "after" on top of "before" according to the 'Overlay' blending mode (link to explanation inside)
+            // this increases the contrast of the region that changed (the "after" region)
+            Image<Gray, byte> overlayResult = doOverlay(average, a.PreprocessedImages.After.Img);
+            a.AddImage(overlayResult, "overlay");
+
+            // invert the result of this blending
+            Image<Gray, byte> overlayInverse = new Image<Gray, byte>(
+                a.PreprocessedImages.After.Img.Width, a.PreprocessedImages.After.Img.Height);
+            CvInvoke.BitwiseNot(overlayResult, overlayInverse);
+            a.AddImage(overlayInverse, "overlayInversion");
+
+            // average the invernted overlay with the "before" image
+            // this reduces contrast of all regions that stayed the same, making the subsequent thresholding step easier
+            Image<Gray, byte> averagedInverse = doAverage(overlayInverse, a.PreprocessedImages.Before.Img);
+            a.AddImage(averagedInverse, "averagedInverse");
+
+            // threshold the result of this averaging to 145 pixels
+            Image<Gray, byte> thresholdedAvgInv = averagedInverse.ThresholdBinary(new Gray(145), new Gray(255));
+            a.AddImage(thresholdedAvgInv, "thresholdedAvgInv");
+
+            // erode x3 iterations to remove noise
+            Image<Gray, byte> erosion = thresholdedAvgInv.Erode(ErodeItr);
+            a.AddImage(erosion, "erosion");
+
+            // dilate x3 iterations to re-expand the remaining detected areas
+            Image<Gray, byte> dilation = erosion.Dilate(DilateItr);
+            a.AddImage(dilation, "dilation");
+        }
+        public static void ProcessByAbsoluteDifference(MeniscusAnalysis a)
+        {
+            Image<Gray, byte> diff = a.PreprocessedImages.Before.Img.AbsDiff(a.PreprocessedImages.After.Img);
+            a.AddImage(diff, "absolute_difference");
+
+            Image<Gray, byte> threshold = diff.ThresholdBinary(new Gray(10), new Gray(255));
+            a.AddImage(threshold, "threshold");
+
+            Image<Gray, byte> erosion = threshold.Erode(ErodeItr);
+            a.AddImage(erosion, "erosion");
+
+            Image<Gray, byte> dilation = erosion.Dilate(DilateItr);
+            a.AddImage(dilation, "dilation");
+        }
+
+        // This should probably accept an average of multiple images for each (before, after), to reduce random noise
+        private static void FindFluidArea(MeniscusAnalysis a, Action<MeniscusAnalysis> processFn)
+        {
+            Preprocess(a);
+            processFn(a);
+        }
+
+        public static MeniscusAnalysis MeniscusFrom2Img(InputImagePair images, Action<MeniscusAnalysis> processFn)
+        {
+            MeniscusAnalysis analysis = new MeniscusAnalysis(images);
+
+            // Produces an image with all fluid mapped to solid white (0xFFFFFF)
+            // and the rest of the image mapped to black (0x000000)
+            FindFluidArea(analysis, processFn);
+
+            // the fluid height is assumed to be the top of the largest contiguous white-shaded area
+            analysis.Height = FindLargestNonBgComponent(analysis.ProcessImages.Last().Img).Top;
+            //return new MeniscusHeight(largestComponent.Bottom - largestComponent.Top, timestamp);
+
+            return analysis;
+        }
+
+        public static MeniscusAnalysis MeniscusFrom2Img(string beforeImgPath, string afterImgPath, Action<MeniscusAnalysis> processFn)
+        {
+            return MeniscusFrom2Img(
+                new InputImagePair(
+                    new Image<Rgb, Byte>(beforeImgPath),
+                    new Image<Rgb, Byte>(afterImgPath)),
+                processFn);
         }
     }
 }
