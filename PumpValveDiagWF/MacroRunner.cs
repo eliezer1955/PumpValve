@@ -81,7 +81,7 @@ namespace PumpValveDiagWF
         public async void RunMacro()
         {
 
-            if (!socketMode)
+           if (!socketMode)
             {
 
             }

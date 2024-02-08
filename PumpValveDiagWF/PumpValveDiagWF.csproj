@@ -125,6 +125,9 @@
     <PackageReference Include="AForge.Video.DirectShow">
       <Version>2.2.5</Version>
     </PackageReference>
+    <PackageReference Include="CenterSpace.NMath.Standard.Windows.X64">
+      <Version>7.4.0.47</Version>
+    </PackageReference>
     <PackageReference Include="Emgu.CV">
       <Version>4.8.1.5350</Version>
     </PackageReference>
