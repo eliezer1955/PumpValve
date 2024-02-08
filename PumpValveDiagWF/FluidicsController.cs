@@ -18,6 +18,9 @@ using System.Threading.Tasks;
 using AForge.Video.DirectShow;
 using AForge.Video;
 using CenterSpace.NMath;
+
+
+
 namespace PumpValveDiagWF
 {
     /// <summary>
@@ -45,7 +48,7 @@ namespace PumpValveDiagWF
         VideoCapture capture1, capture2;
         public int valve;
         public int valvepos;
-
+        public Form1 parent;
         public struct CCStatsOp
         {
             public Rectangle Rectangle;
@@ -123,6 +126,7 @@ namespace PumpValveDiagWF
         public  void initCameras() //Camera initialization
             //this takes a long tme, so it is run asynchronously with GUI
         {
+
             lock (_videoSemaphore) ;
             // Find all cameras
             List<int> videocams = new List<int>();
