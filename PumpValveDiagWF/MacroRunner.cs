@@ -367,7 +367,9 @@ namespace PumpValveDiagWF
                     else
                     {
                         targetImg2 = controller.AcquireFrame( camera );
-                        measurement = controller.MeniscusFrom2Img( referenceImg2, targetImg2 );
+                        //measurement = controller.MeniscusFrom2Img( referenceImg2, targetImg2 );
+                        measurement = controller.MeniscusFrom2ImgVProfile(referenceImg2, targetImg2);
+   
                         _logger.Error("Fluid measurement=" + measurement.ToString());
                         response = measurement.ToString();
                     }

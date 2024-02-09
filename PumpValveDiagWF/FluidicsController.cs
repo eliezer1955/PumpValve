@@ -17,7 +17,7 @@ using System.Net.Sockets;
 using System.Threading.Tasks;
 using AForge.Video.DirectShow;
 using AForge.Video;
-using CenterSpace.NMath;
+using CenterSpace.NMath.Core;
 
 
 
@@ -123,8 +123,8 @@ namespace PumpValveDiagWF
 
         }
 
-        public  void initCameras() //Camera initialization
-            //this takes a long tme, so it is run asynchronously with GUI
+        public void initCameras() //Camera initialization
+                                  //this takes a long tme, so it is run asynchronously with GUI
         {
 
             lock (_videoSemaphore) ;
@@ -153,7 +153,7 @@ namespace PumpValveDiagWF
         {
             localFolder = Directory.GetCurrentDirectory();
             serialSetup();
-            Thread runner = new Thread(() => initCameras()); 
+            Thread runner = new Thread(() => initCameras());
             runner.Start();
             CurrentMacro = runthis;
 
@@ -348,50 +348,17 @@ namespace PumpValveDiagWF
             gray1 = gray1.AbsDiff(gray2);
             //sum all columns of image and get vector (Profile)
             Mat RowSum = new Mat();
-            RowSum.Create(gray1.Rows, 1,DepthType.Cv64F,1);
+            RowSum.Create(gray1.Rows, 1, DepthType.Cv64F, 1);
             CvInvoke.Reduce(gray1, RowSum, ReduceDimension.SingleCol);
-            //var peakf = new CenterSpace.NMath.Core.PeakFinderRuleBased(RowSum);
-            //var peaks=peakf.GetAllPeaks();
+            double[] trace = (double[])RowSum.T().GetData();
+            var peakf = new CenterSpace.NMath.Core.PeakFinderRuleBased(new DoubleVector(trace));
+            var peaks = peakf.LocatePeakIndices();
+            delta = peaks[0];
 
             CvInvoke.Imshow("Before", gray1);
             CvInvoke.Imshow("Profile", RowSum);
             CvInvoke.WaitKey(30);
 
-
-            CvInvoke.Imshow("Subtracted", gray2);
-            CvInvoke.WaitKey(-1);
-
-            Mat imgLabel = new Mat();
-            Mat stats = new Mat();
-            Mat centroids = new Mat();
-
-            int nLabel = CvInvoke.ConnectedComponentsWithStats(gray2, imgLabel, stats, centroids);
-            CCStatsOp[] statsOp = new CCStatsOp[stats.Rows];
-            stats.CopyTo(statsOp);
-            // Find the largest non background component.
-            // Note: range() starts from 1 since 0 is the background label.
-            int maxval = -1;
-            int maxLabel = -1;
-            Rectangle rect1 = new Rectangle(0, 0, 0, 0);
-            for (int i = 1; i < nLabel; i++)
-            {
-                int temp = statsOp[i].Area;
-                if (temp > maxval)
-                {
-                    maxval = temp;
-                    maxLabel = i;
-                    rect1 = statsOp[i].Rectangle;
-                }
-            }
-
-            gray2.Draw(rect1, new Gray(64));
-            CvInvoke.Imshow("Rect", gray2);
-            CvInvoke.WaitKey(-1);
-            if (rect1.Top != 0)
-            {
-                delta = rect1.Top - rect1.Bottom;
-                System.Console.WriteLine(rect1.Top.ToString("G") + rect1.Bottom.ToString("G") + delta.ToString("G"));
-            }
             return delta;
         }
         async public Task SocketMode(string[] CmdLineArgs)
