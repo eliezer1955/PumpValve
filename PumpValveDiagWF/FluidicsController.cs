@@ -340,19 +340,22 @@ namespace PumpValveDiagWF
             double delta = int.MaxValue;
             Image<Gray, byte> gray1;
             Image<Gray, byte> gray2;
-
+            //subtract reference from new image (absolute difference)
             gray1 = new Image<Gray, byte>(img1.Rows, img1.Cols);
             CvInvoke.CvtColor(img1, gray1, Emgu.CV.CvEnum.ColorConversion.Rgb2Gray);
             gray2 = new Image<Gray, byte>(img2.Rows, img2.Cols);
             CvInvoke.CvtColor(img2, gray2, Emgu.CV.CvEnum.ColorConversion.Rgb2Gray);
             gray1 = gray1.AbsDiff(gray2);
-            //sum all columns of image and get vector (Profile)
+            //sum all columns of image row  and get vector (Profile)
             Mat RowSum = new Mat();
             RowSum.Create(gray1.Rows, 1, DepthType.Cv64F, 1);
             CvInvoke.Reduce(gray1, RowSum, ReduceDimension.SingleCol);
+            //find peaks in profile
             double[] trace = (double[])RowSum.T().GetData();
-            var peakf = new CenterSpace.NMath.Core.PeakFinderRuleBased(new DoubleVector(trace));
+            var peakf = new PeakFinderRuleBased(new DoubleVector(trace));
+            peakf.AddRule(PeakFinderRuleBased.Rules.Threshold, 1000.0);
             var peaks = peakf.LocatePeakIndices();
+            //report first "Large" peak
             delta = peaks[0];
 
             CvInvoke.Imshow("Before", gray1);

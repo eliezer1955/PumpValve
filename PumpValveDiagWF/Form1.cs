@@ -25,13 +25,13 @@ namespace PumpValveDiagWF
             //System.Diagnostics.Debugger.Launch();   
             InitializeComponent();
             CmdLineArgs = args;
-            if (args[0] != "Slave")
-                CurrentMacro = args[0];
+            if (args.Length >1 && args[1] != "Slave")
+                CurrentMacro = args[1];
             fluidicsController = new FluidicsController(CurrentMacro, this);
             button3.Text = fluidicsController.CurrentMacro;
 
-            if (CmdLineArgs.Length > 0)
-                if (CmdLineArgs[0] == "Slave")
+            if (CmdLineArgs.Length > 1)
+                if (CmdLineArgs[1] == "Slave")
                 {
                     Thread runner = new Thread( () => fluidicsController.SocketMode( CmdLineArgs ) );
                     runner.Start();
