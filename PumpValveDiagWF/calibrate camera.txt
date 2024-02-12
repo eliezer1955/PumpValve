@@ -1,3 +1,8 @@
+#Turns on the left (A) LED to full power, 'R' means run in the CAVRO command set
+/6A4000R
+# Turns on right (B) LED to a dim level.
+/6B1000R
+
 ALERT,About to snap 0ml reference image
 SNAPREFERENCE,2
 ALERT,About to snap 1ml image Please add 0.5ml water to the chamber
@@ -9,3 +14,4 @@ SNAPMEASURE,2
 ALERT,About to snap 4ml image Please add 0.5ml water to the chamber
 SNAPMEASURE,2
 ALERT,Measurements completed
+
