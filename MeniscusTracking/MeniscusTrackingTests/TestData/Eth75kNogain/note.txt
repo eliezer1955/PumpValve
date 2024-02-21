@@ -1,0 +1,4 @@
+- Fluid is 200-proof ethanol
+- No diffuser was used
+- LED remained at "default" brightness, setting 4000
+- All camera auto-exposure settings were disabled using AmCap, including auto white-balance, which resulted in a blue tint

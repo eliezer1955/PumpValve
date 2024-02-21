@@ -1,0 +1,6 @@
+- fluid is 200-proof ethanol, not water
+- used a diffuser made out of napkin paper and plastic to reduce glare from the leds
+- turned down the led to setting 1000, which is 1/4 of its original brightness
+- no change to camera auto-exposure settings
+- diffuser remained in place through all photos, resulting in near-constant auto-exposure settings that improved the results substantially
+- before photo has a water drop on the side which could affect results

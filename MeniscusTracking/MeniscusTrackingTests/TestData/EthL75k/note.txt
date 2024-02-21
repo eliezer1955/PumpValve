@@ -1,0 +1,4 @@
+- Fluid is pure ethanol
+- No diffuser was used, causing some harsh reflections from the plastic chamber housing
+- LED was original brightness, setting 4000
+- Camera auto-exposure settings were not changed, causing subtle variation between images which could affect results

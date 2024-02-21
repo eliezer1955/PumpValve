@@ -1,0 +1,5 @@
+- Fluid is 200-proof ethanol
+- A diffuser was used to reduce glare from the leds
+- LED setting was lowered to 1000, 1/4 of its original brightness
+- No change was made to camera auto-exposure settings
+- Diffuser remained in place through all photos, resulting in near-constant illumination level which aided results

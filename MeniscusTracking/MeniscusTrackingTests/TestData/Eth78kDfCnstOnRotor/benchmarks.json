@@ -1,0 +1,21 @@
+{
+    "RotorSteps": 78000,
+    "Cases": {
+        "0,0ml-1,0ml":{
+            "Top": 116,
+            "Bottom": 164
+        },
+        "1,0ml-0,0ml":{
+            "Top": 116,
+            "Bottom": 164
+        },
+        "0,0ml-2,0ml":{
+            "Top": 79,
+            "Bottom": 164
+        },
+        "2,0ml-0,0ml":{
+            "Top": 79,
+            "Bottom": 164
+        }
+    }
+}
