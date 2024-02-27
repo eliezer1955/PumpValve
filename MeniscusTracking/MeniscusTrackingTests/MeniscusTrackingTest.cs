@@ -1,11 +1,9 @@
 using MeniscusTracking;
 using System.Drawing.Imaging;
 using System.Drawing;
-using Microsoft.VisualStudio.TestPlatform.ObjectModel;
 
 namespace MeniscusTrackingTests
 {
-
     public class Pair
     {
         public int Bottom { get; set; }
@@ -24,10 +22,15 @@ namespace MeniscusTrackingTests
         // The project launches in \MeniscusTrackingTests\\bin\\Debug\\net8.0, so it's necessary to navigate up
         // three levels to get back to the MeniscusTrackingTests directory
         static string MeniscusTrackingTestsHome = "..\\..\\..";
-        static string dataDir = $"{MeniscusTrackingTestsHome}\\TestData";
-        static string outputDir = $"{MeniscusTrackingTestsHome}\\TestData\\TestOutput";
-        //static string dataDir = "C:\\Users\\ravi_\\workspace\\source\\MeniscusTrackingFork\\MeniscusTrackingTests\\TestData";
-        //static string outputDir = "C:\\Users\\ravi_\\workspace\\source\\MeniscusTrackingFork\\MeniscusTrackingTests\\TestData\\TestOutput";
+        public string GetDataDir()
+        {
+            return $"{Directory.GetCurrentDirectory()}\\{MeniscusTrackingTestsHome}\\TestData";
+        }
+
+        public string GetOutputDir()
+        {
+            return $"{Directory.GetCurrentDirectory()}\\{MeniscusTrackingTestsHome}\\TestData\\TestOutput";
+        }
 
         public string makeSubcaseName(string before, string after)
         {
@@ -36,7 +39,7 @@ namespace MeniscusTrackingTests
 
         public Benchmarks? readBenchmarksFile(string testCase)
         {
-            string benchmarksFile = $"{dataDir}\\{testCase}\\benchmarks.json";
+            string benchmarksFile = $"{GetDataDir()}\\{testCase}\\benchmarks.json";
             if (!File.Exists(benchmarksFile))
             {
                 return null;
@@ -82,7 +85,7 @@ namespace MeniscusTrackingTests
 
         public string saveResults(string testCase, string before, string after, MeniscusAnalysis a, Pair? subcase, string header)
         {
-            string saveDir = $"{outputDir}\\{testCase}_{makeSubcaseName(before, after)}";
+            string saveDir = $"{GetOutputDir()}\\{testCase}_{makeSubcaseName(before, after)}";
             if (!Directory.Exists(saveDir))
                 Directory.CreateDirectory(saveDir);
 
@@ -94,10 +97,10 @@ namespace MeniscusTrackingTests
             // If a benchmarks file exists, compare the results to the benchmarks and save the results along with the error
             // Benchmarks must be hand-identified by looking at the cropped analysis image and deciding where the meniscus should be
             string scNameCsvSafe = makeSubcaseName(before, after).Replace(',', '.');
-            string result = $"{testCase},{scNameCsvSafe},{a.Top},,,{a.Bottom},,";
+            string result = $"{testCase},{scNameCsvSafe},{a.FluidChangeTop},,,{a.FluidChangeBottom},,";
             if (subcase != null)
             {
-                result = $"{testCase},{scNameCsvSafe},{a.Top},{subcase.Top},{calculateErrStr(a.Top, subcase.Top)},{a.Bottom},{subcase.Bottom},{calculateErrStr(a.Bottom, subcase.Bottom)}";
+                result = $"{testCase},{scNameCsvSafe},{a.FluidChangeTop},{subcase.Top},{calculateErrStr(a.FluidChangeTop, subcase.Top)},{a.FluidChangeBottom},{subcase.Bottom},{calculateErrStr(a.FluidChangeBottom, subcase.Bottom)}";
             }
             string resultFile = $"{saveDir}\\result_{a.Timestamp}.csv";
             using (StreamWriter outputFile = new StreamWriter(resultFile))
@@ -107,7 +110,7 @@ namespace MeniscusTrackingTests
             }
 
             // Copy case notes into output directory for reference
-            string notesFile = $"{dataDir}\\{testCase}\\note.txt";
+            string notesFile = $"{GetDataDir()}\\{testCase}\\note.txt";
             if (File.Exists(notesFile) && !File.Exists($"{saveDir}\\note.txt"))
             {
                 File.Copy(notesFile, $"{saveDir}\\note.txt");
@@ -126,18 +129,19 @@ namespace MeniscusTrackingTests
         {
             // associate analysis functions with their names
             Dictionary<Action<MeniscusAnalysis>, string> processFunctions = new Dictionary<Action<MeniscusAnalysis>, string>();
-            processFunctions[MeniscusTracker.ProcessByHorizontalPeakFinder] = "processByHorizontalPeakFinder";
+            //            processFunctions[MeniscusTracker.ProcessByHorizontalPeakAbsDiff] = "processByHorizontalPeakFinder";
+            processFunctions[MeniscusTracker.ProcessByHorizontalPeakRawSubtraction] = "processByHorizontalPeakRawSubtraction";
 
             string[] cases = [
                 // "happy path" cases
-                "Eth78kDfCnstOnRotor",
-                "Eth75kDfCnst",
-                "Eth75kDfCnstDp",
-                "Eth68kDfCnstWdp",
+                //"Eth78kDfCnstOnRotor",
+                //"Eth75kDfCnst",
+                //"Eth75kDfCnstDp",
+                //"Eth68kDfCnstWdp",
                 "Eth68kDfCnstOnRotor",
 
                 // "sad path" cases
-                "EthDfNochange",
+                //"EthDfNochange",
                 "EthDfInsufficientChange",
             ];
             //            cases.Add("Eth75kNogain");
@@ -145,20 +149,20 @@ namespace MeniscusTrackingTests
 
             string[][] comparisons = [
                 // the "happy path" cases
-                ["0,0ml", "1,0ml"],
+                //["0,0ml", "1,0ml"],
                 ["1,0ml", "0,0ml"],
-                ["0,0ml", "2,0ml"],
+                //["0,0ml", "2,0ml"],
                 ["2,0ml", "0,0ml"],
 
                 // The "no change" cases
-                ["1,0ml", "1,0ml 2"],
-                ["2,0ml", "2,0ml 2"],
+                //["1,0ml", "1,0ml 2"],
+                //["2,0ml", "2,0ml 2"],
 
                 // The "insufficient change" cases
-                ["0,5ml", "1,0ml"],
-                ["1,5ml", "2,0ml"],
+                //["0,5ml", "1,0ml"],
+                //["1,5ml", "2,0ml"],
                 ["2,0ml", "1,5ml"],
-                ["1,5ml", "2,0ml"],
+                //["1,5ml", "2,0ml"],
             ];
 
 
@@ -177,8 +181,8 @@ namespace MeniscusTrackingTests
                     foreach (string[] comparison in comparisons)
                     {
                         // Perform the analysis
-                        string before = $"{dataDir}\\{testCase}\\{comparison[0]}.bmp";
-                        string after = $"{dataDir}\\{testCase}\\{comparison[1]}.bmp";
+                        string before = $"{GetDataDir()}\\{testCase}\\{comparison[0]}.bmp";
+                        string after = $"{GetDataDir()}\\{testCase}\\{comparison[1]}.bmp";
                         if (File.Exists(before) && File.Exists(after))
                         {
                             MeniscusAnalysis a = new MeniscusAnalysis(before, after, fn.Key, benchmarks == null ? 68000 : benchmarks.RotorSteps);
@@ -203,7 +207,7 @@ namespace MeniscusTrackingTests
             }
 
             // write a single file containing all results
-            using (StreamWriter outputFile = new StreamWriter($"{outputDir}\\allResults_{DateTime.Now.ToString("yy_MM_ddHHMmmss.ff")}.csv"))
+            using (StreamWriter outputFile = new StreamWriter($"{GetOutputDir()}\\allResults_{DateTime.Now.ToString("yy_MM_ddHHMmmss.ff")}.csv"))
             {
                 foreach (string r in allResults)
                 {
@@ -216,7 +220,14 @@ namespace MeniscusTrackingTests
         }
 
         [TestMethod]
-        public void MeniscusFrom2Img_CharacterizationReport() {
+        public void logfile()
+        {
+            File.AppendAllLines("C:\\ProgramData\\LabScript\\DeviceLog\\danlog.txt", new string[]{"test"});
+        }
+
+            [TestMethod]
+        public void MeniscusFrom2Img_CharacterizationReport()
+        {
             // This reports the actual pixel height of the detected meniscus vs its expected pixel height
             // The purpose is to produce a linear plot of "expected meniscus location" to "actual meniscus location"
 
@@ -236,7 +247,7 @@ namespace MeniscusTrackingTests
                 "Eth68kDfCnstOnRotor",
             ];
 
-            string saveDir = $"{outputDir}\\CharacterizationReport";
+            string saveDir = $"{GetOutputDir()}\\CharacterizationReport";
 
             // iterate over all directories in the TestData folder
             foreach (string testCase in cases)
@@ -245,11 +256,11 @@ namespace MeniscusTrackingTests
                 foreach (float[] comparison in comparisons)
                 {
                     // Perform the analysis
-                    string before = $"{dataDir}\\{testCase}\\{floatToMlName(comparison[0])}.bmp";
-                    string after = $"{dataDir}\\{testCase}\\{floatToMlName(comparison[1])}.bmp";
+                    string before = $"{GetDataDir()}\\{testCase}\\{floatToMlName(comparison[0])}.bmp";
+                    string after = $"{GetDataDir()}\\{testCase}\\{floatToMlName(comparison[1])}.bmp";
                     if (File.Exists(before) && File.Exists(after))
                     {
-                        MeniscusAnalysis a = new MeniscusAnalysis(before, after, MeniscusTracker.ProcessByHorizontalPeakFinder, 68000);
+                        MeniscusAnalysis a = new MeniscusAnalysis(before, after, MeniscusTracker.ProcessByHorizontalPeakAbsDiff, 68000);
                         MeniscusTracker.MeniscusFrom2Img(a);
 
                         // Get the subcase
@@ -267,7 +278,7 @@ namespace MeniscusTrackingTests
                         if (subcase != null)
                             MeniscusTracker.AnnotateDrawingForTest(a.Illustration, subcase.Bottom, subcase.Top);
                         saveAllAnalysisImages(subcaseDir, a);
-                        
+
                         allResults.Add(
                             $"{comparison[0].ToString("F1")}," +
                             $"{comparison[1].ToString("F1")}," +
@@ -296,13 +307,14 @@ namespace MeniscusTrackingTests
         }
 
         [TestMethod]
-        public void TestFluidWasDelivered_ZeroOne(){
+        public void TestFluidWasDelivered_ZeroOne()
+        {
             // Happy path: fluid was delivered as expected
             // Zero to one
             MeniscusAnalysis a = new MeniscusAnalysis(
-                $"{dataDir}\\Eth68kDfCnstOnRotor\\0,0ml.bmp",
-                $"{dataDir}\\Eth68kDfCnstOnRotor\\1,0ml.bmp",
-                MeniscusTracker.ProcessByHorizontalPeakFinder,
+                $"{GetDataDir()}\\Eth68kDfCnstOnRotor\\0,0ml.bmp",
+                $"{GetDataDir()}\\Eth68kDfCnstOnRotor\\1,0ml.bmp",
+                MeniscusTracker.ProcessByHorizontalPeakAbsDiff,
                 68000);
 
             MeniscusTracker.MeniscusFrom2Img(a);
@@ -315,9 +327,9 @@ namespace MeniscusTrackingTests
 
             // One to zero
             a = new MeniscusAnalysis(
-                $"{dataDir}\\Eth68kDfCnstOnRotor\\1,0ml.bmp",
-                $"{dataDir}\\Eth68kDfCnstOnRotor\\0,0ml.bmp",
-                MeniscusTracker.ProcessByHorizontalPeakFinder,
+                $"{GetDataDir()}\\Eth68kDfCnstOnRotor\\1,0ml.bmp",
+                $"{GetDataDir()}\\Eth68kDfCnstOnRotor\\0,0ml.bmp",
+                MeniscusTracker.ProcessByHorizontalPeakAbsDiff,
                 68000);
 
             MeniscusTracker.MeniscusFrom2Img(a);
@@ -330,12 +342,13 @@ namespace MeniscusTrackingTests
         }
 
         [TestMethod]
-        public void TestFluidWasDelivered_ZeroTwo() {
+        public void TestFluidWasDelivered_ZeroTwo()
+        {
             // Zero to two
             MeniscusAnalysis a = new MeniscusAnalysis(
-                $"{dataDir}\\Eth68kDfCnstOnRotor\\0,0ml.bmp",
-                $"{dataDir}\\Eth68kDfCnstOnRotor\\2,0ml.bmp",
-                MeniscusTracker.ProcessByHorizontalPeakFinder,
+                $"{GetDataDir()}\\Eth68kDfCnstOnRotor\\0,0ml.bmp",
+                $"{GetDataDir()}\\Eth68kDfCnstOnRotor\\2,0ml.bmp",
+                MeniscusTracker.ProcessByHorizontalPeakAbsDiff,
                 68000);
 
             MeniscusTracker.MeniscusFrom2Img(a);
@@ -348,9 +361,9 @@ namespace MeniscusTrackingTests
 
             // Two to zero
             a = new MeniscusAnalysis(
-                $"{dataDir}\\Eth68kDfCnstOnRotor\\2,0ml.bmp",
-                $"{dataDir}\\Eth68kDfCnstOnRotor\\0,0ml.bmp",
-                MeniscusTracker.ProcessByHorizontalPeakFinder,
+                $"{GetDataDir()}\\Eth68kDfCnstOnRotor\\2,0ml.bmp",
+                $"{GetDataDir()}\\Eth68kDfCnstOnRotor\\0,0ml.bmp",
+                MeniscusTracker.ProcessByHorizontalPeakAbsDiff,
                 68000);
 
             MeniscusTracker.MeniscusFrom2Img(a);
@@ -363,13 +376,14 @@ namespace MeniscusTrackingTests
         }
 
         [TestMethod]
-        public void TestFluidWasDelivered_NoChange() {
+        public void TestFluidWasDelivered_NoChange()
+        {
             // Edge cases: fluid was not delivered, or an insufficient amount of fluid was delivered
             // No change in fluid level occurred
             MeniscusAnalysis a = new MeniscusAnalysis(
-                $"{dataDir}\\EthDfNochange\\1,0ml.bmp",
-                $"{dataDir}\\EthDfNochange\\1,0ml 2.bmp",
-                MeniscusTracker.ProcessByHorizontalPeakFinder,
+                $"{GetDataDir()}\\EthDfNochange\\1,0ml.bmp",
+                $"{GetDataDir()}\\EthDfNochange\\1,0ml 2.bmp",
+                MeniscusTracker.ProcessByHorizontalPeakAbsDiff,
                 68000);
             MeniscusTracker.MeniscusFrom2Img(a);
 
@@ -380,9 +394,9 @@ namespace MeniscusTrackingTests
             Assert.IsFalse(a.FluidWasDelivered(MeniscusAnalysis.DeliveryVolume.TWO_TO_ZERO));
 
             a = new MeniscusAnalysis(
-                $"{dataDir}\\EthDfNochange\\1,0ml 2.bmp",
-                $"{dataDir}\\EthDfNochange\\1,0ml.bmp",
-                MeniscusTracker.ProcessByHorizontalPeakFinder,
+                $"{GetDataDir()}\\EthDfNochange\\1,0ml 2.bmp",
+                $"{GetDataDir()}\\EthDfNochange\\1,0ml.bmp",
+                MeniscusTracker.ProcessByHorizontalPeakAbsDiff,
                 68000);
             MeniscusTracker.MeniscusFrom2Img(a);
 
@@ -393,9 +407,9 @@ namespace MeniscusTrackingTests
             Assert.IsFalse(a.FluidWasDelivered(MeniscusAnalysis.DeliveryVolume.TWO_TO_ZERO));
 
             a = new MeniscusAnalysis(
-                $"{dataDir}\\EthDfNochange\\2,0ml 2.bmp",
-                $"{dataDir}\\EthDfNochange\\2,0ml.bmp",
-                MeniscusTracker.ProcessByHorizontalPeakFinder,
+                $"{GetDataDir()}\\EthDfNochange\\2,0ml 2.bmp",
+                $"{GetDataDir()}\\EthDfNochange\\2,0ml.bmp",
+                MeniscusTracker.ProcessByHorizontalPeakAbsDiff,
                 68000);
             MeniscusTracker.MeniscusFrom2Img(a);
             // Negative
@@ -405,9 +419,9 @@ namespace MeniscusTrackingTests
             Assert.IsFalse(a.FluidWasDelivered(MeniscusAnalysis.DeliveryVolume.TWO_TO_ZERO));
 
             a = new MeniscusAnalysis(
-                $"{dataDir}\\EthDfNochange\\2,0ml.bmp",
-                $"{dataDir}\\EthDfNochange\\2,0ml 2.bmp",
-                MeniscusTracker.ProcessByHorizontalPeakFinder,
+                $"{GetDataDir()}\\EthDfNochange\\2,0ml.bmp",
+                $"{GetDataDir()}\\EthDfNochange\\2,0ml 2.bmp",
+                MeniscusTracker.ProcessByHorizontalPeakAbsDiff,
                 68000);
             MeniscusTracker.MeniscusFrom2Img(a);
             // Negative
@@ -419,13 +433,14 @@ namespace MeniscusTrackingTests
         }
 
         [TestMethod]
-        public void TestFluidWasDelivered_InsufficientChange() {
+        public void TestFluidWasDelivered_InsufficientChange()
+        {
             // An insufficient change in fluid level occurred
             // One Half <-> One
             MeniscusAnalysis a = new MeniscusAnalysis(
-                $"{dataDir}\\EthDfInsufficientChange\\0,5ml.bmp",
-                $"{dataDir}\\EthDfInsufficientChange\\1,0ml.bmp",
-                MeniscusTracker.ProcessByHorizontalPeakFinder,
+                $"{GetDataDir()}\\EthDfInsufficientChange\\0,5ml.bmp",
+                $"{GetDataDir()}\\EthDfInsufficientChange\\1,0ml.bmp",
+                MeniscusTracker.ProcessByHorizontalPeakAbsDiff,
                 68000);
             MeniscusTracker.MeniscusFrom2Img(a);
             // Negative
@@ -435,9 +450,9 @@ namespace MeniscusTrackingTests
             Assert.IsFalse(a.FluidWasDelivered(MeniscusAnalysis.DeliveryVolume.TWO_TO_ZERO));
 
             a = new MeniscusAnalysis(
-                $"{dataDir}\\EthDfInsufficientChange\\1,0ml.bmp",
-                $"{dataDir}\\EthDfInsufficientChange\\0,5ml.bmp",
-                MeniscusTracker.ProcessByHorizontalPeakFinder,
+                $"{GetDataDir()}\\EthDfInsufficientChange\\1,0ml.bmp",
+                $"{GetDataDir()}\\EthDfInsufficientChange\\0,5ml.bmp",
+                MeniscusTracker.ProcessByHorizontalPeakAbsDiff,
                 68000);
             MeniscusTracker.MeniscusFrom2Img(a);
             // Negative
@@ -448,9 +463,9 @@ namespace MeniscusTrackingTests
 
             // One <-> Three Halves
             a = new MeniscusAnalysis(
-                $"{dataDir}\\EthDfInsufficientChange\\1,0ml.bmp",
-                $"{dataDir}\\EthDfInsufficientChange\\1,5ml.bmp",
-                MeniscusTracker.ProcessByHorizontalPeakFinder,
+                $"{GetDataDir()}\\EthDfInsufficientChange\\1,0ml.bmp",
+                $"{GetDataDir()}\\EthDfInsufficientChange\\1,5ml.bmp",
+                MeniscusTracker.ProcessByHorizontalPeakAbsDiff,
                 68000);
             MeniscusTracker.MeniscusFrom2Img(a);
             // Negative
@@ -460,9 +475,9 @@ namespace MeniscusTrackingTests
             Assert.IsFalse(a.FluidWasDelivered(MeniscusAnalysis.DeliveryVolume.TWO_TO_ZERO));
 
             a = new MeniscusAnalysis(
-                $"{dataDir}\\EthDfInsufficientChange\\1,5ml.bmp",
-                $"{dataDir}\\EthDfInsufficientChange\\1,0ml.bmp",
-                MeniscusTracker.ProcessByHorizontalPeakFinder,
+                $"{GetDataDir()}\\EthDfInsufficientChange\\1,5ml.bmp",
+                $"{GetDataDir()}\\EthDfInsufficientChange\\1,0ml.bmp",
+                MeniscusTracker.ProcessByHorizontalPeakAbsDiff,
                 68000);
             MeniscusTracker.MeniscusFrom2Img(a);
             // Negative
@@ -473,9 +488,9 @@ namespace MeniscusTrackingTests
 
             // Three Halves <-> Two
             a = new MeniscusAnalysis(
-                $"{dataDir}\\EthDfInsufficientChange\\2,0ml.bmp",
-                $"{dataDir}\\EthDfInsufficientChange\\1,5ml.bmp",
-                MeniscusTracker.ProcessByHorizontalPeakFinder,
+                $"{GetDataDir()}\\EthDfInsufficientChange\\2,0ml.bmp",
+                $"{GetDataDir()}\\EthDfInsufficientChange\\1,5ml.bmp",
+                MeniscusTracker.ProcessByHorizontalPeakAbsDiff,
                 68000);
             MeniscusTracker.MeniscusFrom2Img(a);
             // Negative
@@ -485,9 +500,9 @@ namespace MeniscusTrackingTests
             Assert.IsFalse(a.FluidWasDelivered(MeniscusAnalysis.DeliveryVolume.TWO_TO_ZERO));
 
             a = new MeniscusAnalysis(
-                $"{dataDir}\\EthDfInsufficientChange\\1,5ml.bmp",
-                $"{dataDir}\\EthDfInsufficientChange\\2,0ml.bmp",
-                MeniscusTracker.ProcessByHorizontalPeakFinder,
+                $"{GetDataDir()}\\EthDfInsufficientChange\\1,5ml.bmp",
+                $"{GetDataDir()}\\EthDfInsufficientChange\\2,0ml.bmp",
+                MeniscusTracker.ProcessByHorizontalPeakAbsDiff,
                 68000);
             MeniscusTracker.MeniscusFrom2Img(a);
             // Negative
