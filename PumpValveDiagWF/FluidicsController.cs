@@ -18,6 +18,9 @@ using System.Threading.Tasks;
 using AForge.Video.DirectShow;
 using AForge.Video;
 using CenterSpace.NMath.Core;
+using MeniscusTracking;
+using Google.OrTools.ConstraintSolver;
+using System.Reflection;
 
 
 
@@ -28,8 +31,10 @@ namespace PumpValveDiagWF
     /// </summary>
     public class FluidicsController : Object
     {
+
         private readonly log4net.ILog _logger = log4net.LogManager.GetLogger(typeof(FluidicsController));
         public readonly object _videoSemaphore = new object();
+        public bool StopMonitoring = false;
         public struct CommandStructure
         {
             public string name;
@@ -127,27 +132,50 @@ namespace PumpValveDiagWF
                                   //this takes a long tme, so it is run asynchronously with GUI
         {
 
-            lock (_videoSemaphore) ;
-            // Find all cameras
-            List<int> videocams = new List<int>();
-            var allCameras = new AForge.Video.DirectShow.FilterInfoCollection(FilterCategory.VideoInputDevice);
-            for (int i = 0; i < allCameras.Count; i++)
+            lock (_videoSemaphore)
             {
-                string id = allCameras[i].MonikerString;
-
-                if (id.Contains("pid_9422")) //Producer ID for video cameras
+                // Find all cameras
+                List<int> videocams = new List<int>();
+                var allCameras = new AForge.Video.DirectShow.FilterInfoCollection(FilterCategory.VideoInputDevice);
+                for (int i = 0; i < allCameras.Count; i++)
                 {
-                    var videoSource = new VideoCaptureDevice(allCameras[i].MonikerString);
+                    string id = allCameras[i].MonikerString;
                     videocams.Add(i);
+                    if (id.Contains("pid_9422")) //Producer ID for video cameras
+                    {
+                        var videoSource = new VideoCaptureDevice(allCameras[i].MonikerString);
+                        
+                    }
+                }
+                //Create opencv Video Capture objects
+                if (videocams.Count >= 2)
+                {
+                    capture1 = new VideoCapture(videocams[0]);
+                    Console.Write(GetCameraProperties(capture1));
+                    
+                    capture2 = new VideoCapture(videocams[3]);
+                    Console.Write(GetCameraProperties(capture2));
                 }
             }
-            //Create opencv Video Capture objects
-            if (videocams.Count >= 2)
-            {
-                capture1 = new VideoCapture(videocams[0]);
-                capture2 = new VideoCapture(videocams[1]);
-            }
         }
+        
+        
+        public string GetCameraProperties(VideoCapture capture)
+        {
+            string reslt = "";
+            foreach (var prop in Enum.GetValues(typeof(CapProp)))
+            {
+ 
+                double propval = capture.Get((CapProp)prop);
+                if (propval !=-1)
+                {
+                    reslt = reslt + (prop.ToString() + ": " + propval.ToString() + "\r\n");
+                }
+
+            }
+            return reslt;
+        }
+
 
         public FluidicsController(string runthis, Form1 parentIn)
         {
@@ -263,14 +291,23 @@ namespace PumpValveDiagWF
             lock (_videoSemaphore)
             {
                 Image<Rgb, float> accum = new Image<Rgb, float>(640, 480);
+                Image<Rgb, float> temp = new Image<Rgb, float>(640, 480);
                 Image<Rgb, byte> img = new Image<Rgb, byte>(640, 480);
+
+                if (camera == 1)
+                    capture1.Read(img.Mat);
+                else
+                    capture2.Read(img.Mat);
+                return img;
+
                 for (int i = 0; i < 30; i++)
                 {
                     if (camera == 1)
                         capture1.Read(img.Mat);
                     else
                         capture2.Read(img.Mat);
-                    accum += img.Convert<Rgb, float>();
+                    temp = img.Convert<Rgb, float>();
+                    accum = accum.Add(temp);
                 }
                 accum /= 30;
                 img = accum.Convert<Rgb, byte>();
@@ -364,6 +401,33 @@ namespace PumpValveDiagWF
 
             return delta;
         }
+        private delegate void SetControlPropertyThreadSafeDelegate(
+                        System.Windows.Forms.Control control,
+                        string propertyName,
+                        object propertyValue );
+
+        public void SetControlPropertyThreadSafe(
+            Control control,
+            string propertyName,
+            object propertyValue )
+        {
+            if (control.InvokeRequired)
+            {
+                control.Invoke( new SetControlPropertyThreadSafeDelegate
+                ( SetControlPropertyThreadSafe ),
+                new object[] { control, propertyName, propertyValue } );
+            }
+            else
+            {
+                control.GetType().InvokeMember(
+                    propertyName,
+                    BindingFlags.SetProperty,
+                    null,
+                    control,
+                    new object[] { propertyValue } );
+            }
+        }
+
         async public Task SocketMode(string[] CmdLineArgs)
         {
             PipeClient pipeClient = new PipeClient();

@@ -1,3 +1,6 @@
+SNAPREFERENCE,2
+ALERT, Add liquid and hit YES
+SNAPMEASURE,2
 /1ZR#Initialize
 /2ZR#Initialize
 /3ZR#Initialize

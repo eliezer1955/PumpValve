@@ -7,8 +7,9 @@ using Emgu.CV.Structure;
 using System.Linq;
 using MeniscusTracking;
 using Microsoft.SolverFoundation.Services;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement.Rebar;
 
-namespace PumpValveDiagWF
+namespace MeniscusTracking
 {
     public class Meniscus
     {
@@ -130,7 +131,7 @@ namespace PumpValveDiagWF
         public Action<MeniscusAnalysis> ProcessFn;
         public string Timestamp;
 
-        public MeniscusAnalysis(Image<Rgb, byte>beforeImg, Image<Rgb, byte> afterImg, Action<MeniscusAnalysis> pf, int rotorSteps)
+        public MeniscusAnalysis(Image<Rgb,byte> beforeImg, Image<Rgb, byte> afterImg, Action<MeniscusAnalysis> pf, int rotorSteps)
         {
             Bottom = 0;
             // Temporarily initialize to zero
@@ -372,8 +373,11 @@ namespace PumpValveDiagWF
 
         private static Image<Gray, byte> Crop(Image<Gray, byte> i, Rectangle roi)
         {
-            Mat m = new Mat(i.Mat, roi);
-            return m.ToImage<Gray, byte>();
+            Image<Gray, byte> cropped = new Image<Gray, byte>(roi.Height,roi.Width);
+            i.ROI = roi;
+            cropped = i.Copy();
+            CvInvoke.cvResetImageROI(i);
+            return cropped;
         }
 
         private static void preprocess(MeniscusAnalysis a)

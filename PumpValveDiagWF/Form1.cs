@@ -18,7 +18,8 @@ namespace PumpValveDiagWF
         public int position;
         FluidicsController fluidicsController;
         public string CurrentMacro =  "E2E.tst.txt";
-        public string[] CmdLineArgs; 
+        public string[] CmdLineArgs;
+
 
         public Form1( string[] args)
         {
@@ -229,6 +230,16 @@ namespace PumpValveDiagWF
                 button3.Text = fluidicsController.CurrentMacro;
             }
         }
-       
+
+        private void button4_Click( object sender, EventArgs e )
+        {
+            fluidicsController.StopMonitoring = true;
+            button4.Visible = false;
+        }
+
+        private void textBox2_TextChanged( object sender, EventArgs e )
+        {
+
+        }
     }
 }
