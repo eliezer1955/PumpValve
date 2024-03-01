@@ -5,8 +5,6 @@ using Emgu.CV;
 using Emgu.CV.CvEnum;
 using Emgu.CV.Structure;
 using System.Linq;
-using MeniscusTracking;
-using Microsoft.SolverFoundation.Services;
 
 namespace PumpValveDiagWF
 {
@@ -73,7 +71,6 @@ namespace PumpValveDiagWF
         public string Name;
     }
 
-
     public struct Pair
     {
         public int Bottom;
@@ -105,26 +102,71 @@ namespace PumpValveDiagWF
         public const int RotorTopPx78k = 161;
         public const int RotorZeroPosPxOffset = 115;
 
-        public float ExpectedVolumeDelivered;
+        public List<Meniscus> Meniscii;
+        public Meniscus CurrentMeniscus;
+        public Meniscus FormerMeniscus;
 
-        // Numeric data about fluid and chamber
-        // Bottom of the change in column of water. This is usually the top of the grinder, but is conceptually different and therefore
-        // should be a separate variable (in the future, we could measure fluid level changes that do not remove all fluid from the chamber)
-        public int Bottom;
+        // Data about fluid and chamber
+        // positive is increase, negative is decrease. smaller pixel indices are physically ABOVE larger ones.
+        public bool FluidChangeDirection
+        {
+            get
+            {
+                if (CurrentMeniscus != null && FormerMeniscus == null)
+                    return true;
+
+                if (CurrentMeniscus == null && FormerMeniscus != null)
+                    return false;
+
+                if (CurrentMeniscus == null && FormerMeniscus == null)
+                    return true;
+
+                return CurrentMeniscus.BrightestIndex < FormerMeniscus.BrightestIndex;
+            }
+        }
         public int ExpectedGrinderTopPixelPos { get { return CalculateExpectedGrinderTopPixelPos(RotorSteps); } }
+        public int FluidChangeTop { get {
+                if (CurrentMeniscus != null && FormerMeniscus == null)
+                    return CurrentMeniscus.BrightestIndex;
+
+                if (CurrentMeniscus == null && FormerMeniscus != null)
+                    return FormerMeniscus.BrightestIndex;
+
+                if (CurrentMeniscus == null && FormerMeniscus == null)
+                    return 0;
+
+                // If both are not null, return the one closest to the top of the image
+                return CurrentMeniscus.BrightestIndex < FormerMeniscus.BrightestIndex ? 
+                        CurrentMeniscus.BrightestIndex : FormerMeniscus.BrightestIndex;
+            } }
+
+        public int FluidChangeBottom
+        {
+            get
+            {
+                if (CurrentMeniscus != null && FormerMeniscus == null)
+                    return ExpectedGrinderTopPixelPos;
+
+                if (CurrentMeniscus == null && FormerMeniscus != null)
+                    return ExpectedGrinderTopPixelPos;
+
+                if (CurrentMeniscus == null && FormerMeniscus == null)
+                    return ExpectedGrinderTopPixelPos;
+
+                // If both are not null, return the one closest to the top of the image
+                return CurrentMeniscus.BrightestIndex > FormerMeniscus.BrightestIndex ?
+                        CurrentMeniscus.BrightestIndex : FormerMeniscus.BrightestIndex;
+            }
+        }
 
         public static int PixelsPer1ml { get { return (int)(-1 * GetChangeRatePointSlope(MeniscusHeightPx1ml68k, MeniscusHeightPx2ml68k, 1, 2)); } }
         public int RotorSteps;
-        // Top of the change in column of water
-        // Should "Top" be replaced by a List<int> Menisci? If the change is not all the way to zero, there will be 2 menisci.
-        public int Top;
 
         // Images
         public Image<Rgb, byte> Illustration;
         public InputImagePair InputImages;
         public PreprocessedImagePair PreprocessedImages;
         public List<NamedImage> ProcessImages;
-        public List<Meniscus> Meniscii;
 
         // Misc
         public Action<MeniscusAnalysis> ProcessFn;
@@ -132,20 +174,20 @@ namespace PumpValveDiagWF
 
         public MeniscusAnalysis(Image<Rgb, byte>beforeImg, Image<Rgb, byte> afterImg, Action<MeniscusAnalysis> pf, int rotorSteps)
         {
-            Bottom = 0;
+            CurrentMeniscus = null;
+            FormerMeniscus = null;
             // Temporarily initialize to zero
             ExpectedVolumeDelivered = 0;
-            InputImages = new InputImagePair(beforeImg, afterImg);
+            InputImages = new InputImagePair(new Image<Rgb, byte>(beforeImgPath), new Image<Rgb, byte>(afterImgPath));
             PreprocessedImages = null;
             ProcessImages = new List<NamedImage>();
             ProcessFn = pf;
             RotorSteps = rotorSteps;
             Timestamp = DateTime.Now.ToString("yy_MM_ddHHMmmss.ff");
-            Top = 0;
         }
         public void AddImage(Image<Gray, byte> i, string name)
         {
-            ProcessImages.Add(new NamedImage(i,name));
+            ProcessImages.Add(new NamedImage(i, name));
         }
 
         public static int CalculateExpectedGrinderTopPixelPos(int steps)
@@ -170,12 +212,6 @@ namespace PumpValveDiagWF
             return (y2 - y1) / (x2 - x1);
         }
 
-        /*
-        public static bool IsGreaterByPercent(float expectedGreater, float expectedLesser, int percent)
-        {
-            return (((expectedGreater - expectedLesser) / expectedLesser) * 100) > percent;
-        }
-        */
         public static bool IsWithinMilliliters(float actualLocation, float expectedLocation, float milliliters)
         {
             float max = expectedLocation + milliliters * PixelsPer1ml;
@@ -205,11 +241,13 @@ namespace PumpValveDiagWF
                     if (Meniscii.Count == 1)
                     {
                         return IsWithinMilliliters(Meniscii[0].BrightestIndex, CalculateExpectedMeniscusPixelPos(1), leeway);
-                    } else if (Meniscii.Count == 2)
+                    }
+                    else if (Meniscii.Count == 2)
                     {
                         // using much smaller leeway of 0.1ml since the fluid level should be nearly flush with top of grinder
                         return IsWithinMilliliters(Meniscii[1].BrightestIndex, ExpectedGrinderTopPixelPos, 0.1f);
-                    } else
+                    }
+                    else
                     {
                         // there should never be more than 2 meniscii. if there are, log an error and return false
                         return false;
@@ -267,6 +305,17 @@ namespace PumpValveDiagWF
 
         const int WaitTime = 3500;
 
+        // indicates whether to search for the current meniscus location or its former location when searching for the meniscus
+        public enum MeniscusType { CURRENT_MENISCUS, FORMER_MENISCUS };
+        /*
+        public static Func<double, int, bool> GetMeniscusComparator(MeniscusType t)
+        {
+            if (t == MeniscusType.CURRENT_MENISCUS)
+                return (double value, int threshold) => ;
+            else
+                return (double value, int threshold) => ;
+        }
+        */
         // AnnotateDrawingForTest adds two dots indicating the actual benchmark locations of the bottom and meniscus locations, as
         // measured by hand and recorded in the test case benchmarks file. The bottom dot is smaller than the meniscus dot and should
         // always appear beneath it. Both dots are red and should appear to the right of the image.
@@ -287,87 +336,6 @@ namespace PumpValveDiagWF
         {
             CvInvoke.Imshow(DisplayWindow, i);
             CvInvoke.WaitKey(WaitTime);
-        }
-
-        private static void FindFluidColumnHeight(MeniscusAnalysis a)
-        {
-            Mat imgLabel = new Mat();
-            Mat stats = new Mat();
-            Mat centroids = new Mat();
-
-            // Run connected components analysis (get the stats off the image)
-            int nLabel = CvInvoke.ConnectedComponentsWithStats(a.ProcessImages.Last().Img, imgLabel, stats, centroids);
-            CCStatsOp[] statsOp = new CCStatsOp[stats.Rows];
-            stats.CopyTo(statsOp);
-
-            // if there is only the background label, then no components were found, so return early
-            if (nLabel == 0)
-            {
-                return;
-            }
-
-            // find the weighted average of column top and bottom
-            float total1dArea = 0;
-            List<Pair> pairs = new List<Pair>();
-            List<Rectangle> amendedRects = new List<Rectangle>();
-
-            for (int i = 1; i < nLabel; i++)
-            {
-                Rectangle r = statsOp[i].Rectangle;
-
-                // Emgu's coordinate system has (0,0) as the top-left corner of image, with the bottom of the image having the largest
-                // pixel value. Essentially it is upside-down.
-                // skip rectangles that are below the grinder top
-                if (r.Top > a.ExpectedGrinderTopPixelPos)
-                {
-                    continue;
-                }
-
-                Pair p = new Pair(r.Bottom, r.Top);
-
-                // snap the bottom of the rectangle to the top of the grinder
-                if (r.Bottom > a.ExpectedGrinderTopPixelPos) {
-                    p.Bottom = a.ExpectedGrinderTopPixelPos;
-                }
-
-                total1dArea += p.GetDifference();
-                pairs.Add(p);
-                amendedRects.Add(new Rectangle(r.X, r.Y, r.Width, p.GetDifference()));
-            }
-
-            float avgTop = 0;
-            float avgBottom = 0;
-            foreach (Pair p in pairs)
-            {
-                float area = p.GetDifference();
-                avgTop += (area / total1dArea) * p.Top;
-                avgBottom += (area / total1dArea) * p.Bottom;
-            }
-
-            a.Top = (int)avgTop;
-            a.Bottom = (int)avgBottom;
-
-            // add a line showing the identified fluid column height
-            amendedRects.Add(new Rectangle(4, a.Top, 2, a.Bottom - a.Top));
-
-            a.Illustration = a.ProcessImages.Last().Img.Convert<Rgb, byte>();
-
-            // lines for top of grinder, 1ml, and 2ml heights
-            CvInvoke.Rectangle(a.Illustration, new Rectangle(0, a.ExpectedGrinderTopPixelPos, 479, 0), new MCvScalar(0, 255, 255), 1);
-            CvInvoke.Rectangle(a.Illustration, new Rectangle(0, 127, 479, 0), new MCvScalar(255, 255, 0), 1);
-            CvInvoke.Rectangle(a.Illustration, new Rectangle(0, 85, 479, 0), new MCvScalar(255, 255, 0), 1);
-
-            for (int i = 0; i < amendedRects.Count - 1; i++)
-            {
-                Rectangle r = amendedRects[i];
-                // draw a red box around the change area
-                CvInvoke.Rectangle(a.Illustration, r, new MCvScalar(10, 10, 255), 2);
-            }
-
-            // final fluid column measured height
-            CvInvoke.Rectangle(a.Illustration, amendedRects.Last(), new MCvScalar(0, 255, 0), 2);
-
-            return;
         }
 
         private static Image<Gray, byte> Crop(Image<Gray, byte> i, Rectangle roi)
@@ -410,7 +378,7 @@ namespace PumpValveDiagWF
         }
 
         // blackOutExclusionZone replaces all data in the indicated rows with 0x000000
-        private static Image<Gray, byte> blackOutExclusionZone(Image<Gray, byte> img, int[]exclusionZone)
+        private static Image<Gray, byte> blackOutExclusionZone(Image<Gray, byte> img, int[] exclusionZone)
         {
             Image<Gray, byte> blackedOut = new Image<Gray, byte>(img.Width, img.Height);
             for (int y = 0; y < img.Height; y++)
@@ -420,7 +388,8 @@ namespace PumpValveDiagWF
                     if (x >= exclusionZone[0] && x <= exclusionZone[1])
                     {
                         blackedOut.Data[y, x, 0] = 0;
-                    } else
+                    }
+                    else
                     {
                         blackedOut.Data[y, x, 0] = img.Data[y, x, 0];
                     }
@@ -429,30 +398,12 @@ namespace PumpValveDiagWF
             return blackedOut;
         }
 
-        private static Mat getSummedImageRows(Image<Gray, byte> i)
+        private static Mat getSummedImageRows(Image<Gray, double> i)
         {
             Mat rowSum = new Mat();
             rowSum.Create(i.Rows, 1, DepthType.Cv64F, 1);
-            CvInvoke.Reduce(i.Convert<Gray, double>(), rowSum, ReduceDimension.SingleCol);
+            CvInvoke.Reduce(i, rowSum, ReduceDimension.SingleCol);
             return rowSum;
-        }
-
-        public static void ProcessByAbsoluteDifference(MeniscusAnalysis a)
-        {
-            Image<Gray, byte> diff = a.PreprocessedImages.Before.Img.AbsDiff(a.PreprocessedImages.After.Img);
-            a.AddImage(diff, "absolute_difference");
-
-            Image<Gray, byte> threshold = diff.ThresholdBinary(new Gray(3), new Gray(255));
-            a.AddImage(threshold, "threshold");
-
-            Image<Gray, byte> erosion = threshold.Erode(5);
-            a.AddImage(erosion, "erosion");
-
-            Image<Gray, byte> dilation = erosion.Dilate(5);
-            a.AddImage(dilation, "dilation");
-
-            // the fluid height is assumed to be the top of the largest contiguous white-shaded area
-            FindFluidColumnHeight(a);
         }
 
         // findBrightestLine finds the highest value of all values in rowSum
@@ -471,6 +422,112 @@ namespace PumpValveDiagWF
             }
 
             return brightestLine;
+        }
+
+        // findMeniscus finds all possible meniscii above the indicated cutoff, and returns their indices in a list.
+        // A contiguous region of rows is considered a possible meniscus if it is brighter than some minimum threshold. Since a single
+        // meniscus could span many rows, the brightest index of each such grouping is considered the center of the meniscus.
+        private static void findMeniscus(MeniscusAnalysis a, Mat rowSum, int minBrightness, int minThickness)
+        {
+            Array rsData = rowSum.T().GetData();
+            Meniscus formerMeniscus = null;
+            Meniscus currentMeniscus = null;
+
+            // starting i as -1 and incrementing at beginning so I only need to increment in one place
+            int i = -1;
+            foreach (double item in rsData)
+            {
+                i++;
+
+                // end iteration after passing the specified number of rows
+                if (i > a.ExpectedGrinderTopPixelPos)
+                {
+                    if (formerMeniscus != null && a.FormerMeniscus == null && formerMeniscus.Thickness >= minThickness)
+                        a.FormerMeniscus = formerMeniscus;
+
+                    if (currentMeniscus != null && a.CurrentMeniscus == null && currentMeniscus.Thickness >= minThickness)
+                        a.CurrentMeniscus = currentMeniscus;
+
+                    break;
+                }
+
+                // figure out which meniscus to assign
+                // former meniscus case: the old fluid level location
+                if (item > 0)
+                {
+                    // If former meniscus was already assigned, continue
+                    if (a.FormerMeniscus != null)
+                        continue;
+
+                    // If the row doesn't pass the brightness threshold, move to the next row
+                    if (!(item >= minBrightness))
+                    {
+                        if (a.FormerMeniscus == null && formerMeniscus != null && formerMeniscus.Thickness >= minThickness)
+                            a.FormerMeniscus = formerMeniscus;
+
+                        formerMeniscus = null;
+                        continue;
+                    }
+
+                    // The row passed the threshold, so try to add it
+                    if (formerMeniscus == null)
+                    {
+                        // No meniscus, so make one
+                        formerMeniscus = new Meniscus(i, item);
+                    }
+                    else if (formerMeniscus.IsAdjacentTo(i))
+                    {
+                        // Current index is next to meniscus, so add it to meniscus
+                        formerMeniscus.AddIndex(i, item);
+                    }
+                    else
+                    {
+                        // Current index is not next to meniscus, so end collection for this meniscus
+                        // Return the meniscus if it has the correct number of contiguous lines
+                        if (formerMeniscus.Thickness >= minThickness)
+                        {
+                            a.FormerMeniscus = formerMeniscus;
+                        }
+
+                        // If the meniscus didn't pass, reset to null and keep looping
+                        formerMeniscus = null;
+                    }
+
+                } 
+                // current meniscus case: the new fluid level location
+                else
+                {
+                    if (a.CurrentMeniscus != null)
+                        continue;
+
+                    if (!(item <= -1 * minBrightness))
+                    {
+                        if (a.CurrentMeniscus == null && currentMeniscus != null && currentMeniscus.Thickness >= minThickness)
+                            a.CurrentMeniscus = currentMeniscus;
+
+                        currentMeniscus = null;
+                        continue;
+                    }
+
+                    if (currentMeniscus == null)
+                    {
+                        currentMeniscus = new Meniscus(i, item);
+                    }
+                    else if (currentMeniscus.IsAdjacentTo(i))
+                    {
+                        currentMeniscus.AddIndex(i, item);
+                    }
+                    else
+                    {
+                        if (currentMeniscus.Thickness >= minThickness)
+                        {
+                            a.CurrentMeniscus = currentMeniscus;
+                        }
+
+                        currentMeniscus = null;
+                    }
+                }
+            }
         }
 
         // findAllMeniscii finds all possible meniscii above the indicated cutoff, and returns their indices in a list.
@@ -494,7 +551,8 @@ namespace PumpValveDiagWF
                     {
                         // No meniscus, so make one
                         m = new Meniscus(i, item);
-                    } else if (m.IsAdjacentTo(i))
+                    }
+                    else if (m.IsAdjacentTo(i))
                     {
                         // Current index is next to meniscus, so add it to meniscus
                         m.AddIndex(i, item);
@@ -524,7 +582,50 @@ namespace PumpValveDiagWF
             return meniscii;
         }
 
-        public static void ProcessByHorizontalPeakFinder(MeniscusAnalysis a)
+        public static void ProcessByHorizontalPeakRawSubtraction(MeniscusAnalysis a)
+        {
+            //subtract reference from new image as double (cannot be visually represented)
+            Image<Gray, double> before = a.PreprocessedImages.Before.Img.Convert<Gray, double>();
+            Image<Gray, double> after = a.PreprocessedImages.After.Img.Convert<Gray, double>();
+            Image<Gray, double> diff = before - after;
+
+            // skip erosion for now because currently I only know how to do that on the absolute-difference byte image
+
+            // skip blacking-out for now
+            // Image<Gray, byte> blackedOutErosion = blackOutExclusionZone(diff, new int[] { 52, 103 });
+            // a.AddImage(blackedOutErosion, "blacked_out_erosion");
+
+            //get vector of horizontal sum of all image elements. Result is a 1-column vector with values summed in the direction of each row.
+            Mat rowSum = getSummedImageRows(diff);
+
+            // find the index of the brightest line above the grinder, or brightest meniscus
+            findMeniscus(a, rowSum, MeniscusBrightnessMinimum, MeniscusThicknessMinimum);
+
+            Image<Gray, byte> drawing = new Image<Gray, byte>(a.PreprocessedImages.After.Img.Cols, rowSum.Rows);
+            a.PreprocessedImages.After.Img.CopyTo(drawing);
+            a.Illustration = drawing.Convert<Rgb, byte>();
+
+            // lines for EXPECTED top of grinder, 1ml, and 2ml meniscus heights
+            CvInvoke.Rectangle(a.Illustration, new Rectangle(0, a.ExpectedGrinderTopPixelPos, 479, 0), new MCvScalar(0, 255, 255));
+            // color should be cyan
+            CvInvoke.Rectangle(a.Illustration, new Rectangle(0, a.CalculateExpectedMeniscusPixelPos(1), 479, 0), new MCvScalar(255, 255, 0));
+            // color should be magenta
+            CvInvoke.Rectangle(a.Illustration, new Rectangle(0, a.CalculateExpectedMeniscusPixelPos(2), 479, 0), new MCvScalar(255, 0, 255));
+            // final fluid column measured height, should be green
+            CvInvoke.Rectangle(a.Illustration, new Rectangle(4, a.FluidChangeBottom, 2, a.FluidChangeTop - a.FluidChangeBottom), new MCvScalar(0, 255, 0));
+
+            // lines for the meniscii
+            if (a.CurrentMeniscus != null)
+            {
+                CvInvoke.Rectangle(a.Illustration, new Rectangle(0, a.CurrentMeniscus.BrightestIndex, 479, 0), new MCvScalar(0, 255, 0));
+            }
+            if (a.FormerMeniscus != null)
+            {
+                CvInvoke.Rectangle(a.Illustration, new Rectangle(0, a.FormerMeniscus.BrightestIndex, 479, 0), new MCvScalar(0, 150, 0));
+            }
+        }
+
+        public static void ProcessByHorizontalPeakAbsDiff(MeniscusAnalysis a)
         {
             //subtract reference from new image (absolute difference)
             Image<Gray, byte> diff = a.PreprocessedImages.Before.Img.AbsDiff(a.PreprocessedImages.After.Img);
@@ -535,24 +636,26 @@ namespace PumpValveDiagWF
             a.AddImage(erosion, "eroded_with_structuring");
 
             // apply erosion with structuring element to reduce impact of water droplets and other noise
-            Image<Gray, byte> blackedOutErosion = blackOutExclusionZone(erosion, new int[] {52, 103});
+            Image<Gray, byte> blackedOutErosion = blackOutExclusionZone(erosion, new int[] { 52, 103 });
             a.AddImage(blackedOutErosion, "blacked_out_erosion");
 
             //get vector of horizontal sum of all image elements. Result is a 1-column vector with values summed in the direction of each row.
-            Mat rowSum = getSummedImageRows(blackedOutErosion);
+            Mat rowSum = getSummedImageRows(blackedOutErosion.Convert<Gray, double>());
 
             double brightestLine = findBrightestLine(rowSum);
 
             // find the index of the brightest line above the grinder, or brightest meniscus
             a.Meniscii = findAllMeniscii(rowSum, a.ExpectedGrinderTopPixelPos, MeniscusBrightnessMinimum, MeniscusThicknessMinimum);
+            /*
             if (a.Meniscii.Count > 0)
             {
-                a.Top = (int)a.Meniscii.First().BrightestIndex;
+                a.FluidChangeTop = (int)a.Meniscii.First().BrightestIndex;
             }
+            */
 
             Image<Gray, byte> drawing = new Image<Gray, byte>(20 + a.PreprocessedImages.After.Img.Cols, rowSum.Rows);
             Image<Gray, double> img = rowSum.ToImage<Gray, double>();
-            
+
             for (int y = 0; y < a.PreprocessedImages.After.Img.Height; y++)
             {
                 // draw in the left-hand sidebar
@@ -575,7 +678,7 @@ namespace PumpValveDiagWF
                 xOffset = xOffset - 1 > 0 ? xOffset - 1 : 0;
                 drawing.Data[y, xOffset, 0] = 0;
             }
-            a.Illustration = drawing.Convert<Rgb,byte>();
+            a.Illustration = drawing.Convert<Rgb, byte>();
 
             // lines for EXPECTED top of grinder, 1ml, and 2ml meniscus heights
             CvInvoke.Rectangle(a.Illustration, new Rectangle(20, a.ExpectedGrinderTopPixelPos, 479, 0), new MCvScalar(0, 255, 255));
@@ -584,14 +687,14 @@ namespace PumpValveDiagWF
             // color should be magenta
             CvInvoke.Rectangle(a.Illustration, new Rectangle(20, a.CalculateExpectedMeniscusPixelPos(2), 479, 0), new MCvScalar(255, 0, 255));
             // final fluid column measured height, should be green
-            CvInvoke.Rectangle(a.Illustration, new Rectangle(24, a.Top, 2, a.ExpectedGrinderTopPixelPos - a.Top), new MCvScalar(0, 255, 0));
+            CvInvoke.Rectangle(a.Illustration, new Rectangle(24, a.FluidChangeTop, 2, a.ExpectedGrinderTopPixelPos - a.FluidChangeTop), new MCvScalar(0, 255, 0));
 
             // lines for the meniscii
-            if(a.Meniscii.Count > 0)
+            if (a.Meniscii.Count > 0)
             {
                 CvInvoke.Rectangle(a.Illustration, new Rectangle(20, a.Meniscii[0].BrightestIndex, 479, 0), new MCvScalar(0, 255, 0));
             }
-            if(a.Meniscii.Count > 1)
+            if (a.Meniscii.Count > 1)
             {
                 CvInvoke.Rectangle(a.Illustration, new Rectangle(20, a.Meniscii[1].BrightestIndex, 479, 0), new MCvScalar(0, 150, 0));
             }
