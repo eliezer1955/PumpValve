@@ -1,6 +1,7 @@
-SNAPREFERENCE,2
+#SNAPREFERENCE,2
+MONITORWEIGHT,10000
 ALERT, Add liquid and hit YES
-SNAPMEASURE,2
+#SNAPMEASURE,2
 /1ZR#Initialize
 /2ZR#Initialize
 /3ZR#Initialize
@@ -21,7 +22,7 @@ ALERT,Initialization complete!
 /3U7R
 /4U7R
 :TESTVALVES
-ALERT,Please look at right middle valve, it should move after pressing continue
+ALERT,Please look at right middle valve; it should move after pressing continue
 /2ZR#Initialize
 WAIT,2
 /2ZR#Initialize
@@ -41,7 +42,7 @@ WAIT,2
 ALERT, Valve 2 test OK?
 IFRETURNIS,No,LOGERROR,Valve 2 test failure
 
-ALERT,Please look at right top valve, it should move after pressing 'YES'
+ALERT,Please look at right top valve; it should move after pressing 'YES'
 /3ZR
 WAIT,3
 /3ZR
@@ -61,7 +62,7 @@ WAIT,3
 
 ALERT, Valve 3 test OK?
 IFRETURNIS,No,LOGERROR,Valve 3 test failure
-ALERT,Please look at left top valve, it should move after pressing 'YES'
+ALERT,Please look at left top valve; it should move after pressing 'YES'
 /4ZR
 WAIT,4
 /4ZR
@@ -79,7 +80,7 @@ WAIT,4
 :TESTPUMPS
 ALERT, Valve 4 test OK?
 IFRETURNIS,No,LOGERROR,Valve 4 test failure
-ALERT,Please Look at right Syringe, it should move after pressing 'YES'
+ALERT,Please Look at right Syringe; it should move after pressing 'YES'
 /1I3R
 WAIT,1
 /1A3000R
@@ -90,7 +91,7 @@ WAIT,1
 WAIT,1
 ALERT, Right Syringe test OK?
 IFRETURNIS,No,LOGERROR,Right Syringe test failure
-ALERT,Please Look at left Syringe, it should move after pressing 'YES'
+ALERT,Please Look at left Syringe; it should move after pressing 'YES'
 /5I3R
 WAIT,5
 /5A3000R

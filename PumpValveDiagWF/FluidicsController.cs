@@ -180,6 +180,7 @@ namespace PumpValveDiagWF
         public FluidicsController(string runthis, Form1 parentIn)
         {
             localFolder = Directory.GetCurrentDirectory();
+            parent = parentIn;
             serialSetup();
             Thread runner = new Thread(() => initCameras());
             runner.Start();

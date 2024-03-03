@@ -67,6 +67,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ComPortMap.cs" />
+    <Compile Include="CustomDialog.cs" />
     <Compile Include="FluidicsController.cs" />
     <Compile Include="Form1.cs">
       <SubType>Form</SubType>
