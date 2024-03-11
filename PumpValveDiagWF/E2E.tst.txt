@@ -1,7 +1,16 @@
-#SNAPREFERENCE,2
+/9G-320.4R# set weight sensor offset
+/9H1.10R# set weight sensor offset
+/6A,1000R#turn on left LED
+EXECUTE,C:\Users\S2\source\repos\new\RoboClawWF\bin\x64\Debug\WindowsApplication.exe RotateSlow.tst.txt
+SLEEP,2000
+EXECUTE,C:\Users\S2\source\repos\StepperWF1\StepperWF\bin\Debug\StepperWF.exe GrinderDown.txt
+SLEEP,5000
+EXECUTE,C:\Users\S2\source\repos\new\RoboClawWF\bin\x64\Debug\WindowsApplication.exe stop.tst.txt
 MONITORWEIGHT,10000
+SNAPREFERENCE,1
 ALERT, Add liquid and hit YES
-#SNAPMEASURE,2
+SNAPMEASURE,1
+ALERT,Meniscus at %fluidMeasurement%
 /1ZR#Initialize
 /2ZR#Initialize
 /3ZR#Initialize
@@ -14,9 +23,7 @@ WAIT,4
 WAIT,5
 ALERT,Initialization complete!
 
-
 :CONFIGUREVALVES
-
 #Set valve to 6-way
 /2U7R
 /3U7R

@@ -35,8 +35,8 @@ namespace PumpValveDiagWF
                 ImageBox imgBox = new ImageBox();
                 imgBox.Image = img;
             }
-            catch ( Exception ex ) 
-            { 
+            catch (Exception ex)
+            {
             }
         }
 
@@ -96,6 +96,7 @@ namespace PumpValveDiagWF
         private System.Collections.Generic.Dictionary<string, int> label = new System.Collections.Generic.Dictionary<string, int>();
         private String response;
         private Dictionary<string, object> variables = new Dictionary<string, object>();
+        public String fluidMeasurement = " ";
 
         private string ExpandVariables( string instring )
         {
@@ -205,12 +206,13 @@ namespace PumpValveDiagWF
                     response += (char)(c1);
                 } while (c1 != '\n');
                 string ret = response;
-                var  index = ret.IndexOf( (char)3 );
-                
-                var success=  float.TryParse( ret.Substring(3,index-3),out weight);
+                var index = ret.IndexOf( (char)3 );
+
+                var success = float.TryParse( ret.Substring( 3, index - 3 ), out weight );
                 this.controller.SetControlPropertyThreadSafe( controller.parent.textBox1, "Text", weight.ToString() );
-                refreshGUI();   
-            } catch { }
+                refreshGUI();
+            }
+            catch { }
 
             return weight;
 
@@ -384,7 +386,11 @@ namespace PumpValveDiagWF
                         continue;
                     if (parsedLine[1] != null)
                         value = parsedLine[1];
-                    System.Diagnostics.Process.Start( "CMD.exe", "/C " + value );
+                    var proc = System.Diagnostics.Process.Start( "CMD.exe", "/C " + value );
+                    if (parsedLine.Length > 2 && parsedLine[2] == "parallel") continue;
+                    //force serial execution
+                    proc?.WaitForExit();
+                    response = proc?.ExitCode.ToString();
                     continue;
                 }
 
@@ -483,7 +489,12 @@ namespace PumpValveDiagWF
                     MeniscusTracker.MeniscusFrom2Img( FlowDetector );
 
                     if (FlowDetector.Meniscii.Count > 0)
+                    {
                         measurement = FlowDetector.Meniscii[0].BrightestIndex;
+                        fluidMeasurement = ((int)measurement).ToString();
+                        changeVar( "fluidMeasurement", fluidMeasurement );
+                    }
+
                     _logger.Error( "Fluid measurement=" + measurement.ToString() );
                     response = measurement.ToString();
 
@@ -555,6 +566,7 @@ namespace PumpValveDiagWF
                         continue;
                     if (parsedLine[1] != null)
                     {
+                        parsedLine[1] = ExpandVariables( parsedLine[1] );
                         MessageBoxButtons buttons = MessageBoxButtons.YesNo;
                         DialogResult result;
                         result = MessageBox.Show( parsedLine[1], "Fluidics Alert!", buttons );
@@ -562,7 +574,7 @@ namespace PumpValveDiagWF
                         if (response == "No")
                         {
                             var observations = new CustomDialog();
-                            _logger.Error(observations.ShowDialog( parsedLine[1], "Enter observations" ));
+                            _logger.Error( observations.ShowDialog( parsedLine[1], "Enter observations" ) );
                         }
                         continue;
                     }
