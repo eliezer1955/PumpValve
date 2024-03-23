@@ -609,8 +609,11 @@ namespace PumpValveDiagWF
 
                     if (parsedLine[1] != null)
                     {
+                        long logperiod = -1;
                         var period = int.Parse( parsedLine[1] );
-                        MonitorWeight( period );
+                        if (parsedLine.Length > 2 && parsedLine[2] != null)
+                            logperiod = long.Parse( parsedLine[2] );
+                        MonitorWeight( period, logperiod );
                     }
                 }
 
