@@ -1,3 +1,4 @@
+GOTO,INITIALIZE
 /9G-320.4R# set weight sensor offset
 /9H1.10R# set weight sensor offset
 /6A,1000R#turn on left LED
@@ -11,6 +12,7 @@ SNAPREFERENCE,1
 ALERT, Add liquid and hit YES
 SNAPMEASURE,1
 ALERT,Meniscus at %fluidMeasurement%
+:INITIALIZE
 /1ZR#Initialize
 /2ZR#Initialize
 /3ZR#Initialize
@@ -22,6 +24,7 @@ WAIT,3
 WAIT,4
 WAIT,5
 ALERT,Initialization complete!
+STATUS,Configuring valves/pumps
 
 :CONFIGUREVALVES
 #Set valve to 6-way
@@ -29,6 +32,7 @@ ALERT,Initialization complete!
 /3U7R
 /4U7R
 :TESTVALVES
+STATUS,Testing right middle valve
 ALERT,Please look at right middle valve; it should move after pressing continue
 /2ZR#Initialize
 WAIT,2
@@ -48,7 +52,7 @@ WAIT,2
 WAIT,2
 ALERT, Valve 2 test OK?
 IFRETURNIS,No,LOGERROR,Valve 2 test failure
-
+STATUS,Testing right top valve
 ALERT,Please look at right top valve; it should move after pressing 'YES'
 /3ZR
 WAIT,3
@@ -69,6 +73,7 @@ WAIT,3
 
 ALERT, Valve 3 test OK?
 IFRETURNIS,No,LOGERROR,Valve 3 test failure
+STATUS,Testing left top valve
 ALERT,Please look at left top valve; it should move after pressing 'YES'
 /4ZR
 WAIT,4
@@ -87,6 +92,7 @@ WAIT,4
 :TESTPUMPS
 ALERT, Valve 4 test OK?
 IFRETURNIS,No,LOGERROR,Valve 4 test failure
+STATUS,Testing right syringe pump
 ALERT,Please Look at right Syringe; it should move after pressing 'YES'
 /1I3R
 WAIT,1
@@ -97,6 +103,7 @@ WAIT,1
 /1A3000R
 WAIT,1
 ALERT, Right Syringe test OK?
+STATUS,Testing left syringe pump
 IFRETURNIS,No,LOGERROR,Right Syringe test failure
 ALERT,Please Look at left Syringe; it should move after pressing 'YES'
 /5I3R
@@ -109,7 +116,7 @@ WAIT,5
 WAIT,5
 ALERT, Left Syringe test OK?
 IFRETURNIS,No,LOGERROR,Left Syringe test failure
-
+STATUS,Aspirating
 #Pull test
 /1v300R#set start velociry
 /1V300R#set Top Velocity
@@ -137,6 +144,7 @@ WAIT,5
 #Wait for completion
 WAIT,1
 WAIT,5
+STATUS,Dispensing
 ALERT,dispensing
 #dispense
 /1A0R
@@ -146,4 +154,5 @@ ALERT,dispensing
 WAIT,1
 WAIT,5
 ALERT,Success
+STATUS,Test Completed!
 :END

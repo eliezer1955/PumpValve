@@ -355,6 +355,20 @@ namespace PumpValveDiagWF
                     continue;
 
                 }
+                // PRINT STATUS ON gui
+                if (line.StartsWith( "STATUS" ))
+                {
+                    string status = "";
+                    string[] line1 = line.Split( '#' ); //Disregard comments
+                    string[] parsedLine = line1[0].Split( ',' );
+                    if (string.IsNullOrWhiteSpace( parsedLine[0] )) //Disregard blanks lines
+                        continue;
+                    if (parsedLine[1] != null)
+                        status = parsedLine[1];
+                    controller.SetControlPropertyThreadSafe( controller.parent.textBox2, "Text", status );
+                    refreshGUI();
+                    continue;
+                }
                 if (line.StartsWith( "SET" )) //set value of global var; create it if needed
                 {
                     string variable = "";
